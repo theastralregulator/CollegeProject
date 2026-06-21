@@ -79,6 +79,9 @@ export default function AdminPanel({
   const [newAssignment, setNewAssignment] = useState({ title: "", subject: "", departmentId: "computer", semester: 5, dueDate: "2026-07-15", description: "", fileName: "assignment.pdf", fileUrl: "" });
   const [newDonor, setNewDonor] = useState({ name: "", bloodGroup: "O+", departmentId: "computer", semester: 5, place: "", phone: "", isAvailable: true });
 
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ collection: string; id: string; label?: string } | null>(null);
+
   // Request management state
   const [requestSearchQuery, setRequestSearchQuery] = useState("");
   const [requestStatusFilter, setRequestStatusFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
@@ -211,17 +214,23 @@ export default function AdminPanel({
     }
   };
 
-  // Generic Deletion Helper
-  const handleDeleteItem = async (collectionName: string, id: string) => {
-    if (!window.confirm("Are you sure you want to delete this college database record? This cannot be undone.")) return;
+  // Generic Deletion Helper — uses React modal instead of window.confirm (blocked in iframes)
+  const handleDeleteItem = (collectionName: string, id: string, label?: string) => {
+    setDeleteConfirm({ collection: collectionName, id, label });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const { collection: col, id } = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       setInfoMessage(null);
-      await deleteDoc(doc(db, collectionName, id));
-      setInfoMessage(`Deleted record ${id} from list: ${collectionName}.`);
+      await deleteDoc(doc(db, col, id));
+      setInfoMessage(`✅ Record deleted successfully from ${col}.`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Delete error: ${err.message}`);
-      handleFirestoreError(err, OperationType.DELETE, collectionName + "/" + id);
+      handleFirestoreError(err, OperationType.DELETE, col + "/" + id);
     }
   };
 
@@ -319,7 +328,44 @@ export default function AdminPanel({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-7 max-w-sm w-full border border-slate-100 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600 shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">Confirm Delete</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+            {deleteConfirm.label && (
+              <p className="text-xs font-bold text-slate-600 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-100">
+                🗑️ {deleteConfirm.label}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end pt-1">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-xl px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition"
+              >Cancel</button>
+              <button
+                onClick={confirmDelete}
+                className="rounded-xl bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Controller */}
+
       <div className="rounded-3xl border border-slate-100 bg-white p-5 lg:col-span-1 shadow-xs">
         <div className="flex items-center space-x-3 border-b border-slate-100 pb-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
@@ -533,7 +579,7 @@ export default function AdminPanel({
                       <p className="text-[10px] text-slate-400 mt-0.5"><span className="capitalize font-bold">{n.category}</span> • {n.date}</p>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("notices", n.id)}
+                      onClick={() => handleDeleteItem("notices", n.id, n.title)}
                       className="p-1 px-2.5 rounded-lg border border-red-100 hover:bg-red-50 text-red-600 transition"
                       title="Delete Announcement"
                     >
@@ -657,7 +703,7 @@ export default function AdminPanel({
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("faculty", t.id)}
+                      onClick={() => handleDeleteItem("faculty", t.id, t.name)}
                       className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -822,7 +868,7 @@ export default function AdminPanel({
                       <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">Sem {s.semester} • <strong className="uppercase">{s.departmentId}</strong> • Blood: <strong className="text-red-500">{s.bloodGroup}</strong> • Place: {s.place} • Tel: {s.phone} • Parent: {s.parentName} ({s.parentPhone})</p>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("students", s.id)}
+                      onClick={() => handleDeleteItem("students", s.id, s.name)}
                       className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -946,7 +992,7 @@ export default function AdminPanel({
                       <p className="text-[10px] text-slate-400 mt-0.5">{n.subject} • Sem {n.semester} • <strong className="uppercase">{n.departmentId}</strong></p>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("notes", n.id)}
+                      onClick={() => handleDeleteItem("notes", n.id, n.title)}
                       className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1082,7 +1128,7 @@ export default function AdminPanel({
                       <p className="text-[10px] text-slate-400 mt-0.5">Due: {a.dueDate} • Sem {a.semester} <span className="uppercase font-bold">{a.departmentId}</span></p>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("assignments", a.id)}
+                      onClick={() => handleDeleteItem("assignments", a.id, a.title)}
                       className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1206,7 +1252,7 @@ export default function AdminPanel({
                       <p className="text-[10px] text-slate-400 mt-0.5">Year: {qp.year} • Sem {qp.semester} • <strong className="uppercase">{qp.departmentId}</strong></p>
                     </div>
                     <button
-                      onClick={() => handleDeleteItem("questionPapers", qp.id)}
+                      onClick={() => handleDeleteItem("questionPapers", qp.id, qp.title)}
                       className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1328,7 +1374,7 @@ export default function AdminPanel({
                         Toggle Status
                       </button>
                       <button
-                        onClick={() => handleDeleteItem("bloodBank", b.id)}
+                        onClick={() => handleDeleteItem("bloodBank", b.id, b.name)}
                         className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg shrink-0"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

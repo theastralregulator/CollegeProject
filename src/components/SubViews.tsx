@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Search, BookOpen, FileText, ClipboardList, Droplet, Users, 
   MapPin, Award, Mail, Phone, ExternalLink, Calendar, Compass, 
-  Sparkles, CheckCircle2, ChevronRight, GraduationCap, Lock, Unlock, Eye, Send, Clock 
+  Sparkles, CheckCircle2, ChevronRight, GraduationCap, Lock, Unlock, Eye, Send, Clock, PhoneCall, X
 } from "lucide-react";
 import { Notice, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, Department, StudentRequest } from "../types";
 import { db } from "../firebase";
@@ -339,44 +339,9 @@ export function StudentsView({ students, departments, studentRequests = [] }: St
           <p className="text-xs text-slate-400 font-semibold mt-1">List of fellow campus students representing GPC Kaduthuruthy.</p>
         </div>
 
-        {/* Dynamic Unlock Bar */}
-        <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-md w-full">
-          <div className="relative flex-1">
-            <Lock className="absolute left-3.5 top-3 h-3.5 w-3.5 text-slate-400" />
-            <input
-              type="email"
-              value={checkerEmail}
-              onChange={(e) => setCheckerEmail(e.target.value)}
-              placeholder="Enter your authorized email"
-              className="w-full bg-white rounded-xl border border-slate-200 py-1.5 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-            />
-          </div>
-          <button
-            onClick={() => setActiveUnlockEmail(checkerEmail)}
-            className="rounded-xl bg-slate-800 hover:bg-slate-950 text-white text-[11px] font-extrabold px-4 py-1.5 transition whitespace-nowrap"
-          >
-            Unlock Details
-          </button>
-        </div>
       </div>
 
-      {activeUnlockEmail && (
-        <div className="rounded-xl bg-emerald-50 px-4 py-2.5 border border-emerald-150 flex items-center justify-between text-xs text-emerald-800 font-bold">
-          <span className="flex items-center gap-1.5">
-            <Unlock className="h-4 w-4 text-emerald-600 animate-bounce" />
-            Active Unlock Check for: <span className="underline">{activeUnlockEmail}</span>
-          </span>
-          <button
-            onClick={() => {
-              setActiveUnlockEmail("");
-              setCheckerEmail("");
-            }}
-            className="text-[10px] text-emerald-600 hover:text-emerald-800 underline uppercase"
-          >
-            Clear Check
-          </button>
-        </div>
-      )}
+
 
       {/* Query Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-white p-4 rounded-2xl border border-slate-100">
@@ -681,6 +646,54 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
   const [placeFilter, setPlaceFilter] = useState("");
   const [availFilter, setAvailFilter] = useState("all");
 
+  // Phone request modal state
+  const [requestDonor, setRequestDonor] = useState<BloodDonor | null>(null);
+  const [reqName, setReqName] = useState("");
+  const [reqPhone, setReqPhone] = useState("");
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqNote, setReqNote] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const resetForm = () => {
+    setReqName(""); setReqPhone(""); setReqEmail(""); setReqNote("");
+    setSuccessMsg("");
+  };
+
+  const handlePhoneRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestDonor) return;
+    setIsSubmitting(true);
+    try {
+      const requestId = `BLOOD-${Date.now()}`;
+      const payload: StudentRequest = {
+        id: requestId,
+        requestId,
+        studentId: requestDonor.id,
+        studentName: requestDonor.name,
+        requesterName: reqName,
+        requesterEmail: reqEmail,
+        requesterPhone: reqPhone,
+        purpose: `Blood Donor Phone Request — ${requestDonor.bloodGroup}`,
+        department: requestDonor.departmentId,
+        requestedInformation: ["Phone Number"],
+        reasonForRequest: `Emergency blood contact request for donor ${requestDonor.name} (${requestDonor.bloodGroup}).`,
+        additionalNotes: reqNote,
+        status: "pending",
+        requestStatus: "Pending",
+        submittedDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, "studentRequests", requestId), payload);
+      setSuccessMsg(`✅ Your request has been submitted! The admin will review and share ${requestDonor.name}'s contact details soon.`);
+    } catch (err) {
+      console.error(err);
+      setSuccessMsg("❌ Failed to submit request. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const filteredDonors = donors.filter((d) => {
     const matchesBlood = bloodQuery === "all" || d.bloodGroup.toUpperCase() === bloodQuery.toUpperCase();
     const matchesDept = deptFilter === "all" || d.departmentId === deptFilter;
@@ -692,12 +705,117 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
+
+      {/* Phone Request Modal */}
+      {requestDonor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full relative border border-slate-100 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <PhoneCall className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-md font-black text-slate-800 tracking-tight">Request Donor Phone Number</h3>
+                </div>
+                <p className="text-xs text-slate-400 font-semibold ml-10">
+                  Requesting contact for <span className="text-red-600 font-bold">{requestDonor.name}</span>&nbsp;
+                  <span className="bg-red-50 text-red-600 font-extrabold px-2 py-0.5 rounded-lg text-[11px]">{requestDonor.bloodGroup}</span>
+                </p>
+              </div>
+              <button onClick={() => { setRequestDonor(null); resetForm(); }} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {successMsg ? (
+              <div className={`p-5 rounded-2xl border text-xs font-bold leading-relaxed text-center space-y-2 ${
+                successMsg.startsWith("✅") ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-700"
+              }`}>
+                <p className="text-sm">{successMsg}</p>
+                <button
+                  onClick={() => { setRequestDonor(null); resetForm(); }}
+                  className="mt-3 rounded-xl bg-slate-800 text-white px-5 py-2 text-xs font-bold hover:bg-slate-900 transition"
+                >Close</button>
+              </div>
+            ) : (
+              <form onSubmit={handlePhoneRequest} className="space-y-4">
+                <div className="border-b border-slate-100 pb-1">
+                  <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-widest">Your Information</span>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1 ml-1">Your Full Name *</label>
+                  <input
+                    type="text" required value={reqName}
+                    onChange={(e) => setReqName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1 ml-1">Your Phone Number *</label>
+                  <input
+                    type="tel" required value={reqPhone}
+                    onChange={(e) => setReqPhone(e.target.value)}
+                    placeholder="e.g. +91 94455..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1 ml-1">Your Email Address *</label>
+                  <input
+                    type="email" required value={reqEmail}
+                    onChange={(e) => setReqEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1 ml-1">Note / Reason</label>
+                  <textarea
+                    rows={3} value={reqNote}
+                    onChange={(e) => setReqNote(e.target.value)}
+                    placeholder="Briefly explain your reason for contacting this donor (optional)..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 outline-none placeholder:text-slate-400 resize-none focus:bg-white focus:border-red-400"
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => { setRequestDonor(null); resetForm(); }}
+                    className="rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-50 transition"
+                  >Cancel</button>
+                  <button
+                    type="submit" disabled={isSubmitting}
+                    className="rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-400 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-1.5"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    {isSubmitting ? "Submitting..." : "Send Request"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </motion.div>
+        </div>
+      )}
+
       <div className="rounded-3xl bg-linear-to-r from-red-550 to-red-650 p-6 sm:p-8 text-white shadow-xs">
         <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">On-Campus Emergency Blood Bank</h2>
         <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed max-w-2xl font-medium font-sans">
           Welcome to the Govt Polytechnic College Kaduthuruthy student donor registry. Filter and search for active student contributors across departments and semesters for safe local emergency planning.
         </p>
       </div>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-white p-4 rounded-2xl border border-slate-100">
         <div>
@@ -784,8 +902,8 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
                   <p className="text-xs font-semibold text-slate-500 mt-2">
                     📍 Place: {d.place || "N/A"}
                   </p>
-                  
-                  <div className="mt-4 flex items-center gap-2">
+
+                  <div className="mt-3 flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${d.isAvailable ? "bg-green-500 animate-pulse" : "bg-slate-300"}`} />
                     <span className="text-[11px] font-bold text-slate-500">
                       {d.isAvailable ? "Emergency Active" : "Away / Engaged"}
@@ -799,6 +917,15 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
                   </span>
                 </div>
               </div>
+
+              {/* Request Phone Number button */}
+              <button
+                onClick={() => { setRequestDonor(d); resetForm(); }}
+                className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-extrabold py-2 transition active:scale-95"
+              >
+                <PhoneCall className="h-3.5 w-3.5" />
+                Request Phone Number
+              </button>
             </div>
           ))}
         </div>
