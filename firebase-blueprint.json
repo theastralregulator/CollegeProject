@@ -1,0 +1,211 @@
+{
+  "entities": {
+    "Department": {
+      "title": "Department",
+      "description": "Academic engineering branch profile in the college",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "overview": { "type": "string" },
+        "hodName": { "type": "string" },
+        "hodEmail": { "type": "string", "format": "email" },
+        "hodPhoto": { "type": "string" },
+        "studentCount": { "type": "integer" },
+        "facultyCount": { "type": "integer" }
+      },
+      "required": ["id", "name", "code", "overview", "hodName", "hodEmail", "hodPhoto", "studentCount", "facultyCount"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Faculty staff details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photo": { "type": "string" }
+      },
+      "required": ["id", "name", "designation", "departmentId", "email", "photo"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Registered learner profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "semester": { "type": "integer" },
+        "bloodGroup": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" }
+      },
+      "required": ["id", "name", "departmentId", "semester", "bloodGroup", "email", "phone"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "Official college announcement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string", "enum": ["academic", "placement", "event", "general"] },
+        "departmentId": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "date", "category", "departmentId"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Engineering branch lecture note resources",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "semester": { "type": "integer" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "uploadedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "departmentId", "semester", "fileName", "fileUrl", "uploadedBy", "uploadedAt"]
+    },
+    "QuestionPaper": {
+      "title": "QuestionPaper",
+      "description": "Pre-solved technical exam catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "semester": { "type": "integer" },
+        "year": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "departmentId", "semester", "year", "fileName", "fileUrl"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Syllabus homework deadline task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "semester": { "type": "integer" },
+        "dueDate": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "departmentId", "semester", "dueDate", "description"]
+    },
+    "BloodDonor": {
+      "title": "BloodDonor",
+      "description": "Emergency blood donor database record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "semester": { "type": "integer" },
+        "phone": { "type": "string" },
+        "isAvailable": { "type": "boolean" }
+      },
+      "required": ["id", "name", "bloodGroup", "departmentId", "semester", "phone", "isAvailable"]
+    },
+    "StudentRequest": {
+      "title": "StudentRequest",
+      "description": "Student sensitive details release request system approval record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterEmail": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "studentId", "studentName", "requesterName", "requesterEmail", "purpose", "status", "createdAt"]
+    },
+    "NoticeCategory": {
+      "title": "NoticeCategory",
+      "description": "Category categorization classification option item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "CollegeInformation": {
+      "title": "CollegeInformation",
+      "description": "Official Gov. Polytechnic College Kaduthuruthy descriptive roster data record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "key": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["id", "key", "title", "content"]
+    }
+  },
+  "firestore": {
+    "collegeInformation/{infoId}": {
+      "schema": "CollegeInformation",
+      "description": "Govt Polytechnic College Kaduthuruthy official metadata informational pages"
+    },
+    "departments/{deptId}": {
+      "schema": "Department",
+      "description": "College departments offered"
+    },
+    "faculty/{facultyId}": {
+      "schema": "Teacher",
+      "description": "College staff faculty roster"
+    },
+    "students/{studentId}": {
+      "schema": "Student",
+      "description": "College students directory"
+    },
+    "notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "Campus announcement notice boards"
+    },
+    "notes/{noteId}": {
+      "schema": "Note",
+      "description": "Syllabus engineering lecture text files"
+    },
+    "questionPapers/{qpId}": {
+      "schema": "QuestionPaper",
+      "description": "Technical pre-solved previous exams catalog"
+    },
+    "assignments/{assignId}": {
+      "schema": "Assignment",
+      "description": "Engineering branch continuous assignments homeworks list"
+    },
+    "bloodBank/{donorId}": {
+      "schema": "BloodDonor",
+      "description": "Active emergency blood donor community directory roster list"
+    },
+    "studentRequests/{reqId}": {
+      "schema": "StudentRequest",
+      "description": "Release requests for student phone/parent contact number access"
+    },
+    "noticeCategories/{catId}": {
+      "schema": "NoticeCategory",
+      "description": "Official categorized notice labels"
+    }
+  }
+}

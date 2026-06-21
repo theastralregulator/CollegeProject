@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // College Information rules
+    match /collegeInformation/{infoId} {
+      allow read, write: if true;
+    }
+
+    // Departments rules
+    match /departments/{deptId} {
+      allow read, write: if true;
+    }
+
+    // Teachers & Faculty rules
+    match /teachers/{teacherId} {
+      allow read, write: if true;
+    }
+    match /faculty/{facultyId} {
+      allow read, write: if true;
+    }
+
+    // Students rules
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+
+    // Notices & Notice Categories rules
+    match /notices/{noticeId} {
+      allow read, write: if true;
+    }
+    match /noticeCategories/{catId} {
+      allow read, write: if true;
+    }
+
+    // Notes rules
+    match /notes/{noteId} {
+      allow read, write: if true;
+    }
+
+    // Question papers rules
+    match /questionpapers/{qpId} {
+      allow read, write: if true;
+    }
+    match /questionPapers/{qpId} {
+      allow read, write: if true;
+    }
+
+    // Assignments rules
+    match /assignments/{assignId} {
+      allow read, write: if true;
+    }
+
+    // Blood bank rules
+    match /bloodbank/{donorId} {
+      allow read, write: if true;
+    }
+    match /bloodBank/{donorId} {
+      allow read, write: if true;
+    }
+
+    // Student requests rules
+    match /studentRequests/{reqId} {
+      allow read, write: if true;
+    }
+  }
+}

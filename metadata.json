@@ -1,0 +1,8 @@
+{
+  "name": "CampusAI Portal",
+  "description": "Smart Student Portal and AI Assistant for Govt Polytechnic College Kaduthuruthy",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
