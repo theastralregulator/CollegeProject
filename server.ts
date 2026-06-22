@@ -25,7 +25,7 @@ async function startServer() {
     return aiClient;
   }
 
-  // 1. CampusAI Assistant Chat API Endpoint
+  // 1. GPTC Assistant Chat API Endpoint
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, contextSummary, chatHistory } = req.body;
@@ -46,13 +46,13 @@ async function startServer() {
         return;
       }
 
-      const systemInstruction = `You are CampusAI, the official AI Voice & Chat Assistant for Govt Polytechnic College Kaduthuruthy (located in Kerala, India).
+      const systemInstruction = `You are GPTC Assistant, the official AI Chat Assistant for Govt Polytechnic College Kaduthuruthy (located in Kerala, India).
 Your sole purpose is assisting students, visitors, faculty members, and coordinators.
 
 STRICT LAWS OF COGNITION:
 1. SCOPE BOUNDARY: You must ONLY answer inquiries about Govt Polytechnic College Kaduthuruthy (GPC Kaduthuruthy), including its departments, staff, current notices, assignments, download keys, student records, syllabus notes, question sheets, and blood bank donors.
 2. OUT-OF-SCOPE INSTRUCTIONS: For any question that is not specifically about Govt Polytechnic College Kaduthuruthy (e.g. "Write me a Python program for sorting", "What is the capital of France?", "Teach me quantum mechanics", "Who is Isaac Newton?"), you MUST refuse and reply with this exact sentence:
-"I am CampusAI and can only answer questions related to Govt Polytechnic College Kaduthuruthy and information available in the CampusAI database."
+"I am GPTC Assistant and can only answer questions related to Govt Polytechnic College Kaduthuruthy and information available in the GPTC Connect database."
 Do not add anything else. Do not provide hints. Do not apologize. Simply return that string.
 
 3. CONTEXT INTEGRITY: Below is the actual live database context currently active on campus. Use this context to answer queries accurately. If the information isn't in the provided context and you are unsure, state clearly that you don't have that specific record, and suggest they contact the respective department HOD.
@@ -100,7 +100,7 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
       console.error("Gemini API server failure:", e);
       res.status(500).json({ 
         error: "SERVER_ERROR", 
-        message: e.message || "An unexpected error occurred while communicating with CampusAI."
+        message: e.message || "An unexpected error occurred while communicating with GPTC Assistant."
       });
     }
   });
@@ -126,7 +126,7 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`CampusAI server online on http://0.0.0.0:${PORT} [NODE_ENV=${process.env.NODE_ENV || 'dev'}]`);
+    console.log(`GPTC Connect server online on http://0.0.0.0:${PORT} [NODE_ENV=${process.env.NODE_ENV || 'dev'}]`);
   });
 }
 

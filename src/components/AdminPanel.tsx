@@ -254,9 +254,9 @@ export default function AdminPanel({
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-blue-600 to-indigo-600 text-white shadow-md">
             <LogIn className="h-6 w-6" />
           </div>
-          <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-800">Admin Authentication Required</h2>
+          <h2 className="mt-4 text-xl font-bold tracking-tight text-slate-800">GPTC Connect Admin Portal</h2>
           <p className="mt-1.5 text-xs font-semibold text-slate-400 leading-normal px-2">
-            CampusAI administrative database operations are protected. Please log in using college credentials.
+            GPTC Connect administrative database operations are protected. Please log in using college credentials.
           </p>
         </div>
 
@@ -431,7 +431,7 @@ export default function AdminPanel({
         {/* 1. Dashboard Sub-Tab */}
         {activeSubTab === "dashboard" && (
           <div className="space-y-6 animate-fade-in">
-            <h3 className="text-lg font-bold text-slate-800">Database Stat Overview</h3>
+            <h3 className="text-lg font-bold text-slate-800">Welcome to GPTC Connect Administration</h3>
             
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
               {[
@@ -457,7 +457,7 @@ export default function AdminPanel({
             <div className="rounded-2xl bg-linear-to-r from-blue-500 to-indigo-500 p-6 text-white">
               <h4 className="text-md font-bold">Admin Knowledge Injection Control</h4>
               <p className="mt-1 text-xs text-white/85 leading-relaxed font-medium">
-                CampusAI answers voice inquiries using direct access to Firestore data. Any changes, deletions, or notices added below will update the Live Gemini contextual answers instantly! Keep documents accurate and clean.
+                GPTC Connect answers voice inquiries using direct access to Firestore data. Any changes, deletions, or notices added below will update the Live Gemini contextual answers instantly! Keep documents accurate and clean.
               </p>
             </div>
           </div>

@@ -340,13 +340,13 @@ export default function App() {
                       Govt Polytechnic College Kaduthuruthy
                     </p>
                     <h2 className="mt-2 text-3xl sm:text-5xl font-black tracking-tight leading-none text-white drop-shadow-md">
-                      CampusAI
+                      GPTC CONNECT
                     </h2>
                     <p className="mt-1.5 text-md sm:text-xl font-bold tracking-tight text-blue-200">
-                      Smart Student Portal Powered by AI
+                      Your Digital Student Portal
                     </p>
                     <p className="mt-3.5 text-xs sm:text-sm text-slate-200 font-medium max-w-lg leading-relaxed drop-shadow-sm">
-                      Access official digital notes, semester board question catalogs, active academic deadline managers, and our interactive voice-enabled assistant.
+                      A smart digital student portal providing notices, notes, assignments, question papers, blood bank information, department information, and college resources in one place.
                     </p>
 
                     <div className="mt-7 flex flex-wrap gap-3">
@@ -360,7 +360,7 @@ export default function App() {
                         onClick={() => setActiveTab("ai")} 
                         className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/20 rounded-xl text-xs font-bold transition-all active:scale-95"
                       >
-                        Ask CampusAI
+                        Ask GPTC Assistant
                       </button>
                     </div>
                   </div>
@@ -374,7 +374,7 @@ export default function App() {
                         <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                           <span className="text-blue-600 font-bold italic text-sm">AI</span>
                         </div>
-                        <h3 className="font-bold text-slate-800 text-md">Ask CampusAI</h3>
+                        <h3 className="font-bold text-slate-800 text-md">Ask GPTC Assistant</h3>
                         <span className="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Online</span>
                       </div>
                       <p className="text-xs text-slate-500 leading-relaxed font-semibold">
@@ -744,8 +744,16 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Footer */}
+      <footer className="mt-12 mb-20 md:mb-6 border-t border-slate-100 pt-6 pb-4 text-center">
+        <p className="text-sm font-black tracking-widest text-slate-800 uppercase">GPTC Connect</p>
+        <p className="text-xs font-semibold text-slate-400 mt-1">Govt Polytechnic College Kaduthuruthy</p>
+        <p className="text-[10px] text-slate-300 font-medium mt-1">© 2026 All Rights Reserved</p>
+      </footer>
+
       {/* Bottom bar navigation menu */}
       <BottomNav currentTab={activeTab} setTab={(t) => setActiveTab(t)} />
+
 
     </div>
   );

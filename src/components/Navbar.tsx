@@ -26,10 +26,13 @@ export default function Navbar({ currentTab, setTab, isAdminLoggedIn, onLogout }
         >
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-wider text-slate-900 font-sans leading-none">
-              GPTC KADUTHURUTHY
+              GPTC CONNECT
             </h1>
-            <p className="text-[10px] text-blue-600 tracking-widest font-black uppercase mt-1 leading-none">
-              Smart Student Portal
+            <p className="text-[10px] text-blue-600 tracking-widest font-black uppercase mt-0.5 leading-none">
+              Govt Polytechnic College Kaduthuruthy
+            </p>
+            <p className="text-[9px] text-slate-400 tracking-wider font-semibold uppercase mt-0.5 leading-none">
+              Your Digital Student Portal
             </p>
           </div>
         </div>

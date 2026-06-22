@@ -37,7 +37,7 @@ export default function AiAssistant({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "model",
-      text: "👋 Hello! I am CampusAI, your direct voice and knowledge assistant for Govt Polytechnic College Kaduthuruthy.\n\nAsk me anything about board exams, class notes, assignment deadlines, blood doors, or specific syllabus materials!",
+      text: "👋 Hello! I am GPTC Assistant. I can help you with information related to Govt Polytechnic College Kaduthuruthy.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -372,7 +372,7 @@ export default function AiAssistant({
           </div>
           <div>
             <h2 className="text-md font-bold text-slate-800 flex items-center gap-1">
-              CampusAI Assistant
+              GPTC Assistant
             </h2>
             <p className="text-xs text-slate-400 font-medium tracking-wide">Strictly configured for GPC Kaduthuruthy</p>
           </div>
@@ -476,7 +476,7 @@ export default function AiAssistant({
               <div className="w-1 bg-indigo-600 h-11 rounded-full animate-bounce [animation-delay:300ms]" />
               <div className="w-1 bg-blue-500 h-5 rounded-full animate-pulse" />
             </div>
-            <p className="text-xs font-bold text-blue-700">CampusAI is listening...</p>
+            <p className="text-xs font-bold text-blue-700">GPTC Assistant is listening...</p>
             <p className="text-[10px] text-slate-500 text-center">Simulating voice capture based on educational models. Release to analyze.</p>
           </div>
         )}
@@ -533,7 +533,7 @@ export default function AiAssistant({
             placeholder={
               isListeningSimulated
                 ? "Listening... Speak now or type..."
-                : "Ask CampusAI: exam dates, blood donors, S5 web technology notes..."
+                : "Ask GPTC Assistant..."
             }
             className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 pr-14 text-sm font-semibold text-slate-800 placeholder-slate-400 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500"
             disabled={isLoading || isListeningSimulated}
@@ -549,7 +549,7 @@ export default function AiAssistant({
           </button>
         </form>
         <p className="text-[10px] text-slate-400 text-center mt-2.5 font-medium">
-          CampusAI is powered by Gemini 2.5 and strictly bounded to college catalogs. No personal or general data is retained.
+          GPTC Assistant is powered by Gemini 2.5 and strictly bounded to college catalogs. No personal or general data is retained.
         </p>
       </div>
 
