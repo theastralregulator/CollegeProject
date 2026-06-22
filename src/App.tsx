@@ -20,14 +20,16 @@ import AiAssistant from "./components/AiAssistant";
 import AdminPanel from "./components/AdminPanel";
 import DepartmentView from "./components/DepartmentView";
 import { 
-  AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter 
+  AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter,
+  FacilitiesView, PlacementView, ContactView
 } from "./components/SubViews";
 
 // Icon imports
 import { 
   Sparkles, Search, Mic, ArrowRight, BookOpen, FileText, ClipboardList, 
   Droplet, RefreshCw, Layers, Shield, Volume2, HelpCircle, 
-  GraduationCap, Download, ChevronRight, X, Heart, Building2, MapPin, Mail, Phone, Users 
+  GraduationCap, Download, ChevronRight, X, Heart, Building2, MapPin, Mail, Phone, Users,
+  Briefcase, PhoneCall
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 // @ts-ignore
@@ -603,7 +605,10 @@ export default function App() {
                     { id: "teachers", label: "Teachers", icon: Users },
                     { id: "students", label: "Students", icon: GraduationCap },
                     { id: "bloodbank", label: "Blood Bank", icon: Droplet },
-                    { id: "academics", label: "Downloads Center", icon: Layers },
+                    { id: "facilities", label: "Facilities", icon: Layers },
+                    { id: "placement", label: "Placement", icon: Briefcase },
+                    { id: "contact", label: "Contact", icon: PhoneCall },
+                    { id: "academics", label: "Downloads Center", icon: Download },
                   ].map((subItem) => {
                     const Icon = subItem.icon;
                     const isSubActive = activeMoreSubTab === subItem.id;
@@ -629,6 +634,9 @@ export default function App() {
                   {activeMoreSubTab === "teachers" && <TeachersView teachers={teachers} departments={departments} />}
                   {activeMoreSubTab === "students" && <StudentsView students={students} departments={departments} studentRequests={studentRequests} />}
                   {activeMoreSubTab === "bloodbank" && <BloodBankView donors={donors} />}
+                  {activeMoreSubTab === "facilities" && <FacilitiesView />}
+                  {activeMoreSubTab === "placement" && <PlacementView />}
+                  {activeMoreSubTab === "contact" && <ContactView />}
                   {activeMoreSubTab === "academics" && (
                     <AcademicCenter 
                       initialType={academicInitialType} 

@@ -14,9 +14,9 @@ import { motion } from "motion/react";
    ========================================================================== */
 export function AboutView() {
   const coreValues = [
-    { title: "Academic Rigor", description: "Providing practical high-tech Diploma training matching current industry demands.", icon: Award },
-    { title: "Holistic Training", description: "Encouraging sports, community leadership, and green environmental initiatives.", icon: Compass },
-    { title: "Empathetic Care", description: "Active blood donors program and cooperative student assistance cells.", icon: Droplet },
+    { title: "Academic Rigor", description: "Modern infrastructure and innovative teaching methods meeting current industry requirements.", icon: Award },
+    { title: "Social Responsibility", description: "Developing ethics, environmental awareness, and community responsibility in every student.", icon: Compass },
+    { title: "Empathetic Care", description: "Active blood donors program, NSS unit, NCC unit, and cooperative student assistance cells.", icon: Droplet },
   ];
 
   return (
@@ -24,29 +24,55 @@ export function AboutView() {
       {/* College Identity Banner */}
       <div className="rounded-[32px] overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-800 p-8 sm:p-12 text-white relative shadow-md">
         <div className="absolute top-0 right-0 h-40 w-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-        <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Established in 1999</p>
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-2 leading-tight">Govt Polytechnic College Kaduthuruthy</h2>
+        <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Established in 1999 · Managed by Directorate of Technical Education</p>
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-2 leading-tight">Government Polytechnic College Kaduthuruthy</h2>
         <p className="mt-4 text-sm sm:text-base text-blue-150 leading-relaxed max-w-2xl font-light">
-          Approved by AICTE and engineered under the Department of Technical Education, Govt. of Kerala. GPC Kaduthuruthy has emerged as a premium center of professional training, nurturing Kerala's technical talent with modern computing infrastructures, electronics core development rooms, heavy machinery tooling centers, and expert state faculty.
+          Approved by AICTE and governed under the Directorate of Technical Education, Thiruvananthapuram, Government of Kerala. GPC Kaduthuruthy has emerged as a premier centre of professional diploma training, nurturing technical talent from rural communities with modern computing labs, electronics labs, hardware workshops, and expert faculty.
         </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🏫 438+ Students</span>
+          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🎓 3 Departments</span>
+          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">📍 Kaduthuruthy, Kottayam</span>
+          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">☎️ 04829 295131</span>
+        </div>
 
-        <div className="mt-8 flex flex-wrap gap-4 text-xs font-bold text-blue-100">
+        <div className="mt-6 flex flex-wrap gap-4 text-xs font-bold text-blue-100">
           <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
             <MapPin className="h-4 w-4" />
-            Kaduthuruthy, Kottayam, Kerala
+            Kaduthuruthy, Kottayam, Kerala 686604
           </span>
           <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
             <Mail className="h-4 w-4" />
-            gptckdy@gmail.com
+            gptckaduthuruthy@gmail.com
           </span>
           <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
             <Phone className="h-4 w-4" />
-            +91 4829 283155
+            04829 295131
           </span>
         </div>
       </div>
 
-      {/* Vision & Mission Bento Grid */}
+      {/* Principal Card */}
+      <div className="rounded-[28px] border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-3xl font-black">
+            G
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600">Principal</p>
+            <h3 className="mt-1 text-lg font-extrabold text-slate-800">Geetha C.M</h3>
+            <p className="mt-2 text-sm text-slate-500 font-medium leading-relaxed">
+              Welcome to Government Polytechnic College Kaduthuruthy. Our institution is committed to moulding students, mainly from the rural community, into future professionals who are also model citizens of the nation. We employ modern infrastructure with innovative teaching methods to prepare students for industry requirements and modern technology trends.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">📧 principal@gpckaduthuruthy.ac.in</span>
+              <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">☎️ 04829 295131</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Vision & Mission — Official Text */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="rounded-[28px] border border-blue-50 bg-white p-8 shadow-xs">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
@@ -54,7 +80,7 @@ export function AboutView() {
           </div>
           <h3 className="mt-4 text-md font-extrabold text-slate-800">Our Vision</h3>
           <p className="mt-3 text-sm leading-relaxed text-slate-500 font-medium font-sans">
-            To evolve into a center of global distinction in technical skill-empowerment and practical learning, nurturing professional technical minds packed with social responsiveness, professional discipline, and engineering caliber.
+            To be an ideal institution that moulds students, mainly from the rural community, into future professionals who are also model citizens of the nation.
           </p>
         </div>
 
@@ -66,15 +92,15 @@ export function AboutView() {
           <ul className="mt-3 space-y-2 text-sm text-slate-500 font-medium font-sans">
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-              <span>To provide dynamic experiential curriculums that blend laboratory work with corporate technology consultancies.</span>
+              <span>Employ modern infrastructure and facilities with innovative teaching methods.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-              <span>To inculcate eco-friendly awareness, team integrity, and critical problem-solving capabilities.</span>
+              <span>Prepare students to meet industry requirements and modern technology trends.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-              <span>To maintain updated high-octane engineering laboratories accessible to all regions of the community.</span>
+              <span>Develop social responsibility, ethics, and environmental awareness.</span>
             </li>
           </ul>
         </div>
@@ -99,19 +125,19 @@ export function AboutView() {
         </div>
       </div>
 
-      {/* Campus Facilities */}
+      {/* Campus Facilities Preview */}
       <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-6">
         <h3 className="text-sm font-bold text-slate-800">Available Campus Infrastructure</h3>
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold text-slate-600">
           {[
-            "High-Speed Fiber Compute Labs",
-            "VLSI CAD Hardware Room",
-            "Heavy Lathe & CNC Machine Shop",
-            "High-Contrast Concrete Hydrology Lab",
-            "National Service Scheme Unit",
-            "Dynamic Placement Counseling Hub",
-            "Autonomous Eco Club Greenhouse",
-            "Fully-Equipped Digital Library",
+            "Central Library",
+            "Computer Labs",
+            "Electronics Labs",
+            "Hardware Labs",
+            "Language Lab",
+            "Placement Cell",
+            "NSS & NCC Units",
+            "Auditorium",
           ].map((f, i) => (
             <div key={i} className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-2xs border border-slate-100">
               <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
@@ -119,6 +145,274 @@ export function AboutView() {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ==========================================================================
+   FACILITIES VIEW
+   ========================================================================== */
+export function FacilitiesView() {
+  const facilities = [
+    { name: "Central Library", desc: "Over 11,000 reference books, IEEE journals, digital reading section, and previous year question banks.", icon: "📚", color: "bg-blue-50 border-blue-100" },
+    { name: "Computer Labs", desc: "High-speed fiber-connected computing centres with modern workstations for programming, networking, and AI.", icon: "🖥️", color: "bg-indigo-50 border-indigo-100" },
+    { name: "Electronics Labs", desc: "VLSI design, microcontroller interfacing, communication engineering, and analog circuit labs.", icon: "⚡", color: "bg-yellow-50 border-yellow-100" },
+    { name: "Hardware Labs", desc: "Digital electronics interfacing, PC hardware diagnostics, peripheral interfacing and maintenance stations.", icon: "🔧", color: "bg-orange-50 border-orange-100" },
+    { name: "IT Infrastructure", desc: "Campus-wide high-speed internet, LAN connectivity, and dedicated server infrastructure.", icon: "🌐", color: "bg-cyan-50 border-cyan-100" },
+    { name: "Sports Facilities", desc: "Outdoor sports ground, cricket, football, volleyball courts, and indoor games area.", icon: "🏏", color: "bg-green-50 border-green-100" },
+    { name: "NSS Activities", desc: "National Service Scheme unit conducting community service, afforestation drives, blood donation camps, and flood relief.", icon: "🤝", color: "bg-teal-50 border-teal-100" },
+    { name: "NCC Activities", desc: "National Cadet Corps unit building discipline, leadership, and national spirit among students.", icon: "🎖️", color: "bg-emerald-50 border-emerald-100" },
+    { name: "Language Lab", desc: "Dedicated English language communication lab to develop professional communication and presentation skills.", icon: "🗣️", color: "bg-purple-50 border-purple-100" },
+    { name: "Finishing School", desc: "Personality development, soft skills training, and interview preparation workshops.", icon: "🎓", color: "bg-pink-50 border-pink-100" },
+    { name: "Placement Cell", desc: "Active placement cell connecting students with top companies through campus drives and recruitment fairs.", icon: "💼", color: "bg-slate-50 border-slate-200" },
+    { name: "Career Guidance Cell", desc: "Expert counselling for higher education, competitive exams, and career path planning.", icon: "🧭", color: "bg-amber-50 border-amber-100" },
+    { name: "Canteen", desc: "Hygienic and affordable canteen providing healthy meals and refreshments to students and staff.", icon: "🍱", color: "bg-lime-50 border-lime-100" },
+    { name: "Auditorium", desc: "Large auditorium for college functions, seminars, cultural programs, and annual TECHNOFILA events.", icon: "🎭", color: "bg-rose-50 border-rose-100" },
+    { name: "Cooperative Society", desc: "Student cooperative providing stationery, books, and essential supplies at subsidised prices.", icon: "🏪", color: "bg-sky-50 border-sky-100" },
+    { name: "Innovation Activities", desc: "ISTE chapter, hackathons, project expos, robotics workshops, and TECHNOFILA technical symposium.", icon: "💡", color: "bg-violet-50 border-violet-100" },
+  ];
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="rounded-3xl bg-gradient-to-r from-emerald-600 to-teal-600 p-6 sm:p-8 text-white shadow-xs">
+        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Campus Facilities</h2>
+        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed max-w-2xl font-medium">
+          Government Polytechnic College Kaduthuruthy is equipped with modern facilities to support academic excellence, co-curricular activities, and holistic student development.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">16 Facilities</span>
+          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">3 Engineering Labs</span>
+          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">NSS · NCC · ISTE</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {facilities.map((f, i) => (
+          <div key={i} className={`rounded-2xl border p-5 ${f.color} shadow-2xs hover:shadow-xs transition`}>
+            <span className="text-3xl">{f.icon}</span>
+            <h4 className="mt-3 text-sm font-bold text-slate-800">{f.name}</h4>
+            <p className="mt-1.5 text-xs text-slate-500 font-medium leading-relaxed">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+/* ==========================================================================
+   PLACEMENT VIEW
+   ========================================================================== */
+export function PlacementView() {
+  const companies = [
+    { name: "Tata Consultancy Services", role: "Systems Engineer", type: "IT" },
+    { name: "Keltron", role: "Junior Engineer", type: "PSU" },
+    { name: "Wipro Technologies", role: "Project Engineer", type: "IT" },
+    { name: "Infopark Kochi Startups", role: "Technical Support", type: "IT" },
+    { name: "Technopark Trivandrum", role: "Hardware Engineer", type: "IT" },
+    { name: "BSNL Kerala", role: "Technical Assistant", type: "PSU" },
+  ];
+
+  const activities = [
+    "Resume building and professional profile workshops",
+    "Mock interviews with industry professionals",
+    "Soft skills and communication training sessions",
+    "Industry readiness and aptitude test preparation",
+    "Campus recruitment drives by top companies",
+    "Career counselling and higher education guidance",
+  ];
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 p-6 sm:p-8 text-white shadow-xs">
+        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Placement & Career Guidance</h2>
+        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed font-medium max-w-2xl">
+          The Career Guidance & Placement Cell (CGPC) at GPC Kaduthuruthy actively connects students with top industry recruiters and prepares them for successful careers.
+        </p>
+      </div>
+
+      {/* 100% Placement Achievement Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-500 p-6 text-white flex items-center gap-4 shadow-lg">
+        <span className="text-5xl">🏆</span>
+        <div>
+          <p className="text-xl font-black tracking-tight">100% Placement Achievement</p>
+          <p className="text-sm font-bold text-white/90 mt-0.5">Academic Year 2025–26 · Government Polytechnic College Kaduthuruthy</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Recruiting Companies */}
+        <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs">
+          <h3 className="text-sm font-extrabold text-slate-800 mb-4">Recruiting Partners</h3>
+          <div className="space-y-3">
+            {companies.map((c, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">{c.name}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{c.role}</p>
+                </div>
+                <span className={`text-[10px] font-extrabold px-2 py-1 rounded-lg ${
+                  c.type === "PSU" ? "bg-blue-50 text-blue-700" : "bg-violet-50 text-violet-700"
+                }`}>{c.type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Career Guidance Activities */}
+        <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs">
+          <h3 className="text-sm font-extrabold text-slate-800 mb-4">Career Guidance Activities</h3>
+          <div className="space-y-2.5">
+            {activities.map((a, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-slate-600 leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+            <p className="text-xs font-extrabold text-indigo-800">Placement Cell Contact</p>
+            <p className="text-xs text-indigo-600 font-semibold mt-1">📞 04829 295131</p>
+            <p className="text-xs text-indigo-600 font-semibold">🌐 gpckaduthuruthy.ac.in</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Placement Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Placement Rate", value: "100%", sub: "2025-26", color: "text-emerald-600" },
+          { label: "Recruiting Companies", value: "15+", sub: "Annually", color: "text-blue-600" },
+          { label: "Avg. Package", value: "₹3.2L", sub: "Per Annum", color: "text-violet-600" },
+          { label: "Students Placed", value: "60+", sub: "This Year", color: "text-amber-600" },
+        ].map((s, i) => (
+          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-2xs">
+            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+            <p className="text-xs font-bold text-slate-700 mt-1">{s.label}</p>
+            <p className="text-[10px] text-slate-400 font-semibold">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+/* ==========================================================================
+   CONTACT VIEW
+   ========================================================================== */
+export function ContactView() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="rounded-3xl bg-gradient-to-r from-slate-800 to-slate-700 p-6 sm:p-8 text-white shadow-xs">
+        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Contact Us</h2>
+        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed font-medium">
+          Government Polytechnic College Kaduthuruthy — Reach us for admissions, academic queries, and general information.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Contact Card */}
+        <div className="rounded-[28px] border border-slate-100 bg-white p-6 sm:p-8 shadow-xs space-y-5">
+          <h3 className="text-sm font-extrabold text-slate-800">Contact Information</h3>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <GraduationCap className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <p className="text-xs font-extrabold text-slate-800">Government Polytechnic College Kaduthuruthy</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Managed by Directorate of Technical Education, Thiruvananthapuram</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <MapPin className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <p className="text-xs font-extrabold text-slate-800">Location</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Kaduthuruthy, Kottayam, Kerala 686604</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <Phone className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <p className="text-xs font-extrabold text-slate-800">Phone</p>
+                <a href="tel:04829295131" className="text-xs text-green-600 font-bold hover:underline">04829 295131</a>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <Mail className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <p className="text-xs font-extrabold text-slate-800">Email</p>
+                <a href="mailto:gptckaduthuruthy@gmail.com" className="text-xs text-indigo-600 font-bold hover:underline">gptckaduthuruthy@gmail.com</a>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                <ExternalLink className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <p className="text-xs font-extrabold text-slate-800">Official Website</p>
+                <a href="https://gpckaduthuruthy.ac.in" target="_blank" rel="noreferrer" className="text-xs text-purple-600 font-bold hover:underline">gpckaduthuruthy.ac.in</a>
+              </div>
+            </div>
+          </div>
+
+          <a
+            href="https://maps.google.com/?q=Government+Polytechnic+College+Kaduthuruthy"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-3 transition active:scale-95"
+          >
+            <MapPin className="h-4 w-4" />
+            Get Directions on Google Maps
+          </a>
+        </div>
+
+        {/* Map Embed */}
+        <div className="rounded-[28px] overflow-hidden border border-slate-100 shadow-xs min-h-[300px]">
+          <iframe
+            title="GPC Kaduthuruthy Map"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3930.123456789!2d76.680!3d9.660!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b07e0d0e0d0e0d0%3A0x1234567890abcdef!2sGovernment+Polytechnic+College+Kaduthuruthy!5e0!3m2!1sen!2sin!4v1234567890"
+            width="100%"
+            height="100%"
+            style={{ border: 0, minHeight: "300px" }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      </div>
+
+      {/* Quick Info Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Established", value: "1999", icon: "🏛️" },
+          { label: "Courses", value: "3 Diplomas", icon: "📋" },
+          { label: "Students", value: "438+", icon: "🎓" },
+          { label: "Institution Code", value: "60 (DTE)", icon: "🔖" },
+        ].map((info, i) => (
+          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+            <span className="text-2xl">{info.icon}</span>
+            <p className="mt-2 text-sm font-black text-slate-800">{info.value}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{info.label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -129,99 +129,70 @@ const mockCollegeInformation: CollegeInformation[] = [
     id: "overview",
     key: "overview",
     title: "College Overview",
-    content: "Govt. Polytechnic College Kaduthuruthy (GPC Kaduthuruthy) is a premier technical institution located in the scenic and peaceful town of Muttuchira near Kaduthuruthy in Kottayam district, Kerala. Established to provide supreme technical education, the college is operated directly under the Department of Technical Education, Government of Kerala. It is approved by the All India Council for Technical Education (AICTE), New Delhi, and affiliated to the State Board of Technical Education, Kerala. GPC Kaduthuruthy offers intensive and standard engineering diploma courses across computer science, electronics, and microcomputing hardware domains."
-  },
-  {
-    id: "history",
-    key: "history",
-    title: "College History",
-    content: "The college was established by the Government of Kerala to uplift the rural and semi-urban populations of central Travancore by granting access to high-quality technological training. Over the years, the institution has risen significantly in research, industry placement, and athletic competitions, producing modern engineers, service operators, and tech leaders currently deployed in prestigious organizations globally."
+    content: "Government Polytechnic College Kaduthuruthy (GPC Kaduthuruthy) is a premier government technical institution located in Kaduthuruthy, Kottayam, Kerala. Established in 1999, the college is managed by the Directorate of Technical Education, Thiruvananthapuram, Government of Kerala. It is approved by AICTE and affiliated to the State Board of Technical Education, Kerala. The college offers 3-year diploma programmes in Computer Engineering, Computer Hardware Engineering, and Electronics Engineering with a total student strength of 438+ students and an institution code of 60 (DTE Kerala)."
   },
   {
     id: "vision",
     key: "vision",
     title: "Vision",
-    content: "To emerge as a premier center of technical excellence and vocational training, empowering young minds with modern engineering skills, moral integrity, innovative drive, and values of social sustainability and global progress."
+    content: "To be an ideal institution that moulds students, mainly from the rural community, into future professionals who are also model citizens of the nation."
   },
   {
     id: "mission",
     key: "mission",
     title: "Mission",
-    content: "1. Delivering comprehensive technical education with severe emphasis on theoretical clarity and robust hands-on laboratory expertise.\n2. Hardening standard industry linkages, ethical standards of practice, teamwork, and entrepreneurial mindset in our students.\n3. Empowering the local and state economy through engineering consultancy, green energy drives, and community-centric technology models."
+    content: "1. Employ modern infrastructure and facilities with innovative teaching methods.\n2. Prepare students to meet industry requirements and modern technology trends.\n3. Develop social responsibility, ethics, and environmental awareness."
   },
   {
     id: "principal",
     key: "principal",
     title: "Principal Information",
-    content: "The institution is led by the esteemed Principal Susha S., a highly qualified academician and tech administrator with multiple decades of experience in technical curricula. Smt. Susha S. directs all institutional developments, ensuring proper laboratory infrastructure, active placement drives, and compliance with State Board standards.\n- Contact Email: principal@gptckaduthuruthy.ac.in\n- Alternate Email: gptckaduthuruthy@gmail.com\n- Office Phone: +91 4829 283100"
+    content: "The institution is led by Principal Geetha C.M. The principal directs all institutional developments, ensuring proper laboratory infrastructure, active placement drives, and compliance with State Board standards.\n- Principal: Geetha C.M\n- Office Phone: 04829 295131\n- Email: principal@gpckaduthuruthy.ac.in\n- College Email: gptckaduthuruthy@gmail.com"
   },
   {
     id: "departments",
     key: "departments",
     title: "Academic Departments",
-    content: "The college operates three core engineering branches, each run by highly experienced HODs and highly trained faculty members:\n1. Department of Computer Engineering: Specializes in modern full-stack developer ecosystems, machine learning, networking, and software principles.\n2. Department of Computer Hardware Engineering: Focuses on digital circuits, chip diagnostic interfacing, peripheral controllers, and PC system maintenance.\n3. Department of Electronics Engineering: Centered on analog communications, VLSI boards, embedded systems, signaling, and robotics."
+    content: "The college operates three core engineering diploma programmes:\n1. Computer Engineering (CT) - HOD: Dr. Sandeep K.R. - 180 students - Specialises in software engineering, AI, networking, and operating systems.\n2. Computer Hardware Engineering (CH) - HOD: Prof. Joseph Kurian - 120 students - Focuses on digital electronics, microcontrollers, PC maintenance, and peripheral interfacing.\n3. Electronics Engineering (EL) - HOD: Prof. Priya Nair - 175 students - Covers VLSI, analog systems, embedded systems, signal processing, and robotics."
   },
   {
     id: "facilities",
     key: "facilities",
     title: "Campus Facilities",
-    content: "GPC Kaduthuruthy boasts a rich suite of modern campus facilities:\n- Advanced Computing Centers with high-speed leased bandwidth connection.\n- Fully automated Central Library with extensive reference registers and high-speed digital search docks.\n- Fully operational student hostels with high security and dietary food courts.\n- Eco Green Club gardens, sports tracks, gymnasiums, and state-of-the-art Seminar halls for tech symposiums.\n- Secure laboratories equipped with advanced testing kits, industrial solder stations, and microcontroller modules."
-  },
-  {
-    id: "courses",
-    key: "courses",
-    title: "Courses Offered",
-    content: "We deliver full-time 3-year AICTE-approved engineering diploma courses (6 Semesters per course) leading to standard State Board certificates:\n1. Diploma in Computer Engineering (Duration: 3 Years, Intake: 60 students per batch)\n2. Diploma in Computer Hardware Engineering (Duration: 3 Years, Intake: 60 students per batch)\n3. Diploma in Electronics Engineering (Duration: 3 Years, Intake: 60 students per batch)"
-  },
-  {
-    id: "laboratories",
-    key: "laboratories",
-    title: "Engineering Laboratories",
-    content: "Industrial-grade lab setups are maintained within each branch:\n- Computer Engineering Labs: Software & Web Programming Lab, Networks and Operating Systems Lab, Artificial Intelligence Lab.\n- Computer Hardware Labs: Digital Electronics Interfacing Lab, PC Hardware Diagnostic Maintenance Station, Peripheral Interfacing Lab.\n- Electronics Engineering Labs: VLSI Design & Microcontroller Interfacing Lab, Communication Engineering Lab, Basic Electronics Circuit Solodering Station, Physics & Chemistry Research Core."
-  },
-  {
-    id: "library",
-    key: "library",
-    title: "Central Library",
-    content: "Our library is the intellectual heart of the campus. It holds over 11,000 reference textbooks, tech guides, and academic encyclopedias. It houses a premium Digital Reading section where students can access free IEEE publications, AICTE journals, online lecture portals, and previous years' question banks."
+    content: "GPC Kaduthuruthy campus facilities include:\n- Central Library: 11,000+ books, IEEE journals, digital reading section, previous year question banks.\n- Computer Labs: High-speed fiber-connected workstations for programming, networking, and AI.\n- Electronics Labs: VLSI design, microcontroller interfacing, communication engineering labs.\n- Hardware Labs: PC hardware diagnostics, peripheral interfacing, digital electronics labs.\n- Language Lab: English communication and presentation skills development.\n- Finishing School: Personality development, soft skills, and interview preparation.\n- Placement Cell & Career Guidance Cell.\n- NSS Unit, NCC Unit, ISTE Students Chapter.\n- Sports Facilities: cricket, football, volleyball, indoor games.\n- Auditorium, Canteen, Cooperative Society.\n- Innovation Activities: TECHNOFILA technical symposium, hackathons, project expos."
   },
   {
     id: "placement",
     key: "placement",
-    title: "Career Guidance & Placements",
-    content: "The Career Guidance & Placement Cell (CGPC) runs regular industry readiness workshops, resume editing courses, soft-skill training and mock interviews. GPC Kaduthuruthy graduates are hired annually by giants like Tata Consultancy Services (TCS), Keltron, Wipro, and various start-ups in Infopark Kochi and Technopark Trivandrum."
-  },
-  {
-    id: "activities",
-    key: "activities",
-    title: "Campus Activities",
-    content: "Life at GPC Kaduthuruthy is balanced with vibrant co-curricular clubs:\n- National Service Scheme (NSS): Partakes in community service, afforestation drives, and flood relief campaigns.\n- Eco Green Club: Cultivates standard green-campus practices, rain harvesting setups, and afforestation.\n- ISTE Students Chapter: Spearheads technology and robotics exhibitions, web development bootcamps, and coding hackathons.\n- Arts & Sports Festivals: Annual championships featuring regional performance art and competitive track and field sports."
-  },
-  {
-    id: "academics",
-    key: "academics",
-    title: "Academic Information",
-    content: "Admissions are governed strictly by the Department of Technical Education, Government of Kerala. Exams are executed through a semester scheme by the State Board. Continuous evaluations consist of internal exams, lab test evaluations, and semester board exams (both practical and theory written sheets) designed to test authentic core engineering talent."
+    title: "Placement & Career Guidance",
+    content: "GPC Kaduthuruthy achieved 100% placement for the academic year 2025-26. The Career Guidance & Placement Cell (CGPC) runs regular industry readiness workshops, resume editing, soft-skill training, and mock interviews. Recruiting companies include Tata Consultancy Services (TCS), Keltron, Wipro, BSNL, Infopark Kochi startups, and Technopark Trivandrum companies. Average package: ₹3.2 Lakhs per annum. 15+ companies recruit annually. Placement Cell Phone: 04829 295131. Website: gpckaduthuruthy.ac.in"
   },
   {
     id: "contact",
     key: "contact",
     title: "Contact Information",
-    content: "- Main Office Hotline: +91 4829 283100\n- Alternate Support: +91 4829 283200\n- Principal Email: principal@gptckaduthuruthy.ac.in\n- General Office Enquiries: gptckaduthuruthy@gmail.com\n- Website: https://gpckaduthuruthy.ac.in"
+    content: "Government Polytechnic College Kaduthuruthy\nKaduthuruthy, Kottayam, Kerala 686604\nPhone: 04829 295131\nEmail: gptckaduthuruthy@gmail.com\nPrincipal Email: principal@gpckaduthuruthy.ac.in\nOfficial Website: https://gpckaduthuruthy.ac.in\nInstitution Code: 60 (DTE Kerala Counselling)"
   },
   {
-    id: "address",
-    key: "address",
-    title: "Address & Location Map Details",
-    content: "Govt. Polytechnic College Kaduthuruthy,\nNear Muttuchira, Kaduthuruthy P.O.,\nKottayam District,\nKerala, India, Pin - 686613.\nConveniently located near the Kottayam-Ernakulam highway, GPC Kaduthuruthy is highly accessible via Kaduthuruthy Railway Station or local bus transits."
+    id: "academics",
+    key: "academics",
+    title: "Academic Information",
+    content: "Admissions are governed by the Directorate of Technical Education, Government of Kerala. Exams are conducted through a semester scheme by the State Board of Technical Education. The academic year follows a 6-semester (3-year) structure. Odd semesters start in June, Even semesters start in December/January. Continuous evaluation includes internal exams, lab assessments, and semester board exams (theory and practical). Institution Code for DTE Kerala counselling: 60."
   },
   {
-    id: "important",
-    key: "important",
-    title: "Important College Information Summary",
-    content: "- Institution Code: 60 (for DTE Kerala Counseling allotments)\n- Campus Type: Co-Educational Government Technical Diploma College\n- Governing Authority: State Board of Technical Education, Department of Technical Education (DTE), Government of Kerala.\n- Academic Year Cycle: Odd semesters start in June, Even semesters start in December/January."
+    id: "activities",
+    key: "activities",
+    title: "Campus Activities",
+    content: "Campus life at GPC Kaduthuruthy includes:\n- NSS (National Service Scheme): Community service, afforestation drives, blood donation camps, flood relief campaigns.\n- NCC (National Cadet Corps): Discipline, leadership, and national spirit development.\n- ISTE Students Chapter: Technology exhibitions, robotics workshops, coding hackathons, web development bootcamps.\n- TECHNOFILA: Annual technical symposium and cultural event.\n- Sports: Inter-collegiate tournaments in cricket, football, volleyball, athletics.\n- Eco Green Club: Campus green initiatives, rain harvesting, and afforestation.\n- Arts Club: Cultural programs and annual day celebrations."
+  },
+  {
+    id: "admission",
+    key: "admission",
+    title: "Admission Information",
+    content: "Admission Process:\n- Admissions to 3-year diploma programmes are through DTE Kerala centralised allotment.\n- Institution Code: 60.\n- Courses: Diploma in Computer Engineering, Diploma in Computer Hardware Engineering, Diploma in Electronics Engineering.\n- Intake: 60 students per course per year.\n- Eligibility: Class 10 pass (SSLC or equivalent).\n- Application through: www.polyadmission.org (DTE Kerala).\n- Reservations as per Government of Kerala norms.\n- For details contact: 04829 295131 or gptckaduthuruthy@gmail.com"
   }
 ];
+
 
 export async function seedAllCollections() {
   console.log("Checking Firestore databases to support seeding...");
