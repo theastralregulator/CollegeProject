@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { AdminUser, AdminRole, AdminPermissions } from "../types";
@@ -73,11 +73,26 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Live listener on adminUsers collection
+  // Live listener on new Vercel-compatible "users" collection
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "adminUsers"), (snap) => {
+    const unsub = onSnapshot(collection(db, "users"), (snap) => {
       const list: AdminUser[] = [];
-      snap.forEach((d) => list.push(d.data() as AdminUser));
+      snap.forEach((d) => {
+        const data = d.data();
+        // Only list users that have a role property (i.e. admin panel users)
+        if (data.role) {
+          list.push({
+            uid: data.uid || d.id,
+            email: data.email || "",
+            name: data.fullName || data.name || "Admin",
+            phone: data.phone || "",
+            role: data.role as AdminRole,
+            suspended: data.suspended ?? false,
+            customPermissions: data.permissions || data.customPermissions || {},
+            createdAt: data.createdAt || new Date().toISOString(),
+          });
+        }
+      });
       list.sort((a, b) => a.name.localeCompare(b.name));
       setAdmins(list);
       setLoading(false);
@@ -97,7 +112,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     );
   });
 
-  // ── CREATE ADMIN ──────────────────────────────────────────────────────────
+  // ── CREATE ADMIN (Client-side, Vercel-compatible via secondary Auth app) ──
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError("");
@@ -109,17 +124,57 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     }
     setIsCreating(true);
     try {
-      const res = await fetch("/api/create-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...createForm, createdBy: currentAdminEmail }),
+      const { getApps, initializeApp, getApp } = await import("firebase/app");
+      const { getAuth, createUserWithEmailAndPassword, signOut } = await import("firebase/auth");
+      const { doc, setDoc } = await import("firebase/firestore");
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyCPOJ75w5cN41mmyhZxuN7URBO-X-hL0qU",
+        authDomain: "ai-studio-applet-webapp-d8652.firebaseapp.com",
+        projectId: "ai-studio-applet-webapp-d8652",
+        storageBucket: "ai-studio-applet-webapp-d8652.firebasestorage.app",
+        messagingSenderId: "349783760184",
+        appId: "1:349783760184:web:56289f30d4d216fab775cd"
+      };
+
+      const secondaryAppName = "secondary-auth-creator";
+      const apps = getApps();
+      const secondaryApp = apps.some(a => a.name === secondaryAppName)
+        ? getApp(secondaryAppName)
+        : initializeApp(firebaseConfig, secondaryAppName);
+
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // 1. Create account using secondary Auth instance
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        createForm.email.trim(),
+        createForm.password
+      );
+      const newUid = userCredential.user.uid;
+
+      // 2. Save additional user information in Firestore users/{uid}
+      const userDocRef = doc(db, "users", newUid);
+      const permissions = DEFAULT_PERMISSIONS[createForm.role];
+      await setDoc(userDocRef, {
+        uid: newUid,
+        fullName: createForm.name,
+        email: createForm.email.trim(),
+        phone: createForm.phone || "",
+        role: createForm.role,
+        permissions,
+        suspended: false,
+        createdAt: new Date().toISOString(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to create admin");
+
+      // 3. Clean up/sign out secondary instance
+      await signOut(secondaryAuth);
+
       showToast("success", `Admin "${createForm.name}" created successfully!`);
       setCreateForm({ name: "", email: "", phone: "", role: "admin", password: "" });
       setShowCreate(false);
     } catch (err: any) {
+      console.error("[Create Admin client-side] Error:", err);
       setCreateError(err.message || "Failed to create admin.");
     } finally {
       setIsCreating(false);
@@ -136,69 +191,63 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     setEditCustomPerms(hasCustom ? (admin.customPermissions as Partial<AdminPermissions>) : {});
   };
 
-  // ── SAVE EDIT ─────────────────────────────────────────────────────────────
+  // ── SAVE EDIT (Client-side, Vercel-compatible) ───────────────────────────
   const handleSaveEdit = async () => {
     if (!editingAdmin) return;
     setIsSaving(true);
     try {
-      const updates: any = {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const userDocRef = doc(db, "users", editingAdmin.uid);
+      const permissions = useCustomPerms ? editCustomPerms : DEFAULT_PERMISSIONS[editRole];
+
+      await updateDoc(userDocRef, {
         role: editRole,
         suspended: editSuspended,
-        customPermissions: useCustomPerms ? editCustomPerms : {},
-      };
-      const res = await fetch("/api/update-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: editingAdmin.uid, updates }),
+        permissions,
+        updatedAt: new Date().toISOString(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Update failed");
+
       showToast("success", `Admin "${editingAdmin.name}" updated.`);
       setEditingAdmin(null);
     } catch (err: any) {
+      console.error("[Save Edit client-side] Error:", err);
       showToast("error", err.message || "Failed to update admin.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── RESET PASSWORD ────────────────────────────────────────────────────────
+  // ── RESET PASSWORD (Client-side, Vercel-compatible via email link) ──────────
   const handleResetPassword = async () => {
-    if (!showPasswordReset || newPassword.length < 6) return;
+    if (!showPasswordReset) return;
+    const targetAdmin = admins.find((a) => a.uid === showPasswordReset);
+    if (!targetAdmin) return;
     setIsResetting(true);
     try {
-      const res = await fetch("/api/reset-admin-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: showPasswordReset, newPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Reset failed");
-      showToast("success", "Password reset successfully.");
+      const { auth: mainAuth } = await import("../firebase");
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+      await sendPasswordResetEmail(mainAuth, targetAdmin.email);
+      showToast("success", `Password reset email sent to ${targetAdmin.email}.`);
       setShowPasswordReset(null);
-      setNewPassword("");
     } catch (err: any) {
-      showToast("error", err.message || "Failed to reset password.");
+      console.error("[Reset Password client-side] Error:", err);
+      showToast("error", err.message || "Failed to send password reset email.");
     } finally {
       setIsResetting(false);
     }
   };
 
-  // ── DELETE ADMIN ──────────────────────────────────────────────────────────
+  // ── DELETE ADMIN (Client-side, Vercel-compatible via Firestore deletion) ──
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     setIsDeleting(true);
     try {
-      const res = await fetch("/api/delete-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: deleteConfirm.uid }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Delete failed");
-      showToast("success", `Admin "${deleteConfirm.name}" deleted.`);
+      const { doc, deleteDoc } = await import("firebase/firestore");
+      await deleteDoc(doc(db, "users", deleteConfirm.uid));
+      showToast("success", `Admin "${deleteConfirm.name}" removed.`);
       setDeleteConfirm(null);
     } catch (err: any) {
+      console.error("[Delete Admin client-side] Error:", err);
       showToast("error", err.message || "Failed to delete admin.");
     } finally {
       setIsDeleting(false);
@@ -211,6 +260,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     if (useCustomPerms) return { ...base, ...editCustomPerms };
     return base;
   };
+
 
   return (
     <div className="space-y-6 animate-fade-in relative">
@@ -509,24 +559,17 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
               </button>
             </div>
             <div className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">New Password *</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Min. 6 characters"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500"
-                />
-              </div>
+              <p className="font-semibold text-slate-600 leading-relaxed">
+                Are you sure you want to send a password reset link to the administrator's email address? This allows them to set a new password securely.
+              </p>
               <div className="flex gap-2">
                 <button onClick={() => setShowPasswordReset(null)} className="flex-1 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
                 <button
                   onClick={handleResetPassword}
-                  disabled={isResetting || newPassword.length < 6}
+                  disabled={isResetting}
                   className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-2.5 font-bold transition disabled:opacity-50"
                 >
-                  {isResetting ? "Resetting..." : "Reset Password"}
+                  {isResetting ? "Sending..." : "Send Reset Email"}
                 </button>
               </div>
             </div>
