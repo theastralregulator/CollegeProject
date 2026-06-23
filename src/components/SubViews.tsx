@@ -2,78 +2,261 @@ import React, { useState, useEffect } from "react";
 import { 
   Search, BookOpen, FileText, ClipboardList, Droplet, Users, 
   MapPin, Award, Mail, Phone, ExternalLink, Calendar, Compass, 
-  Sparkles, CheckCircle2, ChevronRight, GraduationCap, Lock, Unlock, Eye, Send, Clock, PhoneCall, X
+  Sparkles, CheckCircle2, ChevronRight, GraduationCap, Lock, Unlock, Eye, Send, Clock, PhoneCall, X,
+  Briefcase, Image
 } from "lucide-react";
-import { Notice, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, Department, StudentRequest } from "../types";
+import { Notice, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, Department, StudentRequest, OutsiderBloodDonor, OutsiderBloodDonorRequest } from "../types";
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc } from "firebase/firestore";
 import { motion } from "motion/react";
-
+import { sendEmailNotification } from "../utils/emailService";
 /* ==========================================================================
    ABOUT VIEW
    ========================================================================== */
-export function AboutView() {
+interface AboutViewProps {
+  departments?: Department[];
+}
+
+export function AboutView({ departments = [] }: AboutViewProps) {
+  const [activeSection, setActiveSection] = useState("overview");
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
+
+  const sections = [
+    { id: "overview", label: "Overview" },
+    { id: "vision-mission", label: "Vision & Mission" },
+    { id: "departments", label: "Departments" },
+    { id: "facilities", label: "Facilities" },
+    { id: "placement", label: "Placement Cell" },
+    { id: "contact", label: "Contact Info" },
+    { id: "gallery", label: "Campus Gallery" }
+  ];
+
+  // Set up Intersection Observer for active section highlighting
+  useEffect(() => {
+    const observerOptions = {
+      root: null,
+      rootMargin: "-20% 0px -60% 0px",
+      threshold: 0
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    sections.forEach((sec) => {
+      const el = document.getElementById(sec.id);
+      if (el) observer.observe(el);
+    });
+
+    return () => {
+      sections.forEach((sec) => {
+        const el = document.getElementById(sec.id);
+        if (el) observer.unobserve(el);
+      });
+    };
+  }, []);
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   const coreValues = [
     { title: "Academic Rigor", description: "Modern infrastructure and innovative teaching methods meeting current industry requirements.", icon: Award },
     { title: "Social Responsibility", description: "Developing ethics, environmental awareness, and community responsibility in every student.", icon: Compass },
     { title: "Empathetic Care", description: "Active blood donors program, NSS unit, NCC unit, and cooperative student assistance cells.", icon: Droplet },
   ];
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      {/* College Identity Banner */}
-      <div className="rounded-[32px] overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-800 p-8 sm:p-12 text-white relative shadow-md">
-        <div className="absolute top-0 right-0 h-40 w-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-        <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Established in 1999 · Managed by Directorate of Technical Education</p>
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-2 leading-tight">Government Polytechnic College Kaduthuruthy</h2>
-        <p className="mt-4 text-sm sm:text-base text-blue-150 leading-relaxed max-w-2xl font-light">
-          Approved by AICTE and governed under the Directorate of Technical Education, Thiruvananthapuram, Government of Kerala. GPC Kaduthuruthy has emerged as a premier centre of professional diploma training, nurturing technical talent from rural communities with modern computing labs, electronics labs, hardware workshops, and expert faculty.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🏫 438+ Students</span>
-          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🎓 3 Departments</span>
-          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">📍 Kaduthuruthy, Kottayam</span>
-          <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">☎️ 04829 295131</span>
-        </div>
+  const displayDepartments = departments.length > 0 ? departments : [
+    {
+      id: "computer",
+      name: "Computer Engineering",
+      code: "CT",
+      overview: "Computer Engineering department offers rigorous exposure to software engineering, real-time operating systems, artificial intelligence, networking, and micro-processing architecture. Equipped with state-of-the-art computer networks, and laboratories.",
+      hodName: "Dr. Sandeep K. R.",
+      hodEmail: "hod.ct@gptckaduthuruthy.ac.in",
+      hodPhoto: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&h=300&q=80",
+      studentCount: 180,
+      facultyCount: 12
+    },
+    {
+      id: "hardware",
+      name: "Computer Hardware Engineering",
+      code: "CH",
+      overview: "Specialized focus on digital electronics, microcontroller programming, system maintenance, peripheral interfacing, and hardware-software co-design.",
+      hodName: "Prof. Joseph Kurian",
+      hodEmail: "hod.ch@gptckaduthuruthy.ac.in",
+      hodPhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&h=300&q=80",
+      studentCount: 120,
+      facultyCount: 8
+    },
+    {
+      id: "electronics",
+      name: "Electronics Engineering",
+      code: "EL",
+      overview: "Delving into advanced circuitry, analog systems, VLSI chips, signal processing, embedded systems, and robotic hardware.",
+      hodName: "Prof. Priya Nair",
+      hodEmail: "hod.el@gptckaduthuruthy.ac.in",
+      hodPhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&h=300&q=80",
+      studentCount: 138,
+      facultyCount: 10
+    }
+  ];
 
-        <div className="mt-6 flex flex-wrap gap-4 text-xs font-bold text-blue-100">
-          <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
-            <MapPin className="h-4 w-4" />
-            Kaduthuruthy, Kottayam, Kerala 686604
-          </span>
-          <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
-            <Mail className="h-4 w-4" />
-            gptckaduthuruthy@gmail.com
-          </span>
-          <span className="flex items-center gap-1 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
-            <Phone className="h-4 w-4" />
-            04829 295131
-          </span>
-        </div>
+  const facilities = [
+    { name: "Central Library", desc: "Over 11,000 reference books, IEEE journals, digital reading section, and previous year question banks.", icon: "📚", color: "bg-blue-50 border-blue-100" },
+    { name: "Computer Labs", desc: "High-speed fiber-connected computing centres with modern workstations for programming, networking, and AI.", icon: "🖥️", color: "bg-indigo-50 border-indigo-100" },
+    { name: "Electronics Labs", desc: "VLSI design, microcontroller interfacing, communication engineering, and analog circuit labs.", icon: "⚡", color: "bg-yellow-50 border-yellow-100" },
+    { name: "Hardware Labs", desc: "Digital electronics interfacing, PC hardware diagnostics, peripheral interfacing and maintenance stations.", icon: "🔧", color: "bg-orange-50 border-orange-100" },
+    { name: "IT Infrastructure", desc: "Campus-wide high-speed internet, LAN connectivity, and dedicated server infrastructure.", icon: "🌐", color: "bg-cyan-50 border-cyan-100" },
+    { name: "Sports Facilities", desc: "Outdoor sports ground, cricket, football, volleyball courts, and indoor games area.", icon: "🏏", color: "bg-green-50 border-green-100" },
+    { name: "NSS Activities", desc: "National Service Scheme unit conducting community service, afforestation drives, blood donation camps, and flood relief.", icon: "🤝", color: "bg-teal-50 border-teal-100" },
+    { name: "NCC Activities", desc: "National Cadet Corps unit building discipline, leadership, and national spirit among students.", icon: "🎖️", color: "bg-emerald-50 border-emerald-100" },
+    { name: "Language Lab", desc: "Dedicated English language communication lab to develop professional communication and presentation skills.", icon: "🗣️", color: "bg-purple-50 border-purple-100" },
+    { name: "Finishing School", desc: "Personality development, soft skills training, and interview preparation workshops.", icon: "🎓", color: "bg-pink-50 border-pink-100" },
+    { name: "Placement Cell", desc: "Active placement cell connecting students with top companies through campus drives and recruitment fairs.", icon: "💼", color: "bg-slate-50 border-slate-200" },
+    { name: "Career Guidance Cell", desc: "Expert counselling for higher education, competitive exams, and career path planning.", icon: "🧭", color: "bg-amber-50 border-amber-100" },
+    { name: "Canteen", desc: "Hygienic and affordable canteen providing healthy meals and refreshments to students and staff.", icon: "🍱", color: "bg-lime-50 border-lime-100" },
+    { name: "Auditorium", desc: "Large auditorium for college functions, seminars, cultural programs, and annual TECHNOFILA events.", icon: "🎭", color: "bg-rose-50 border-rose-100" },
+    { name: "Cooperative Society", desc: "Student cooperative providing stationery, books, and essential supplies at subsidised prices.", icon: "🏪", color: "bg-sky-50 border-sky-100" },
+    { name: "Innovation Activities", desc: "ISTE chapter, hackathons, project expos, robotics workshops, and TECHNOFILA technical symposium.", icon: "💡", color: "bg-violet-50 border-violet-100" },
+  ];
+
+  const companies = [
+    { name: "Tata Consultancy Services", role: "Systems Engineer", type: "IT" },
+    { name: "Keltron", role: "Junior Engineer", type: "PSU" },
+    { name: "Wipro Technologies", role: "Project Engineer", type: "IT" },
+    { name: "Infopark Kochi Startups", role: "Technical Support", type: "IT" },
+    { name: "Technopark Trivandrum", role: "Hardware Engineer", type: "IT" },
+    { name: "BSNL Kerala", role: "Technical Assistant", type: "PSU" },
+  ];
+
+  const activities = [
+    "Resume building and professional profile workshops",
+    "Mock interviews with industry professionals",
+    "Soft skills and communication training sessions",
+    "Industry readiness and aptitude test preparation",
+    "Campus recruitment drives by top companies",
+    "Career counselling and higher education guidance",
+  ];
+
+  const galleryImages = [
+    { title: "Campus Main Building", category: "Campus", url: "https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=800&q=80" },
+    { title: "Computer Programming Lab", category: "Academic", url: "https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&w=800&q=80" },
+    { title: "Hardware Diagnostics Workshop", category: "Academic", url: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80" },
+    { title: "Central Reading Room", category: "Library", url: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=800&q=80" },
+    { title: "Smart Seminar Hall", category: "Facilities", url: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=800&q=80" },
+    { title: "Outdoor Sports Ground", category: "Campus Life", url: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80" },
+    { title: "Electronics Design Lab", category: "Academic", url: "https://images.unsplash.com/photo-1517055720413-77a282b81d3d?auto=format&fit=crop&w=800&q=80" },
+    { title: "Green Campus Walkway", category: "Campus Life", url: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80" }
+  ];
+
+  return (
+    <div className="space-y-12 animate-fade-in relative pb-16">
+      {/* Sticky Sub-Navigation Glassmorphic Jump Bar */}
+      <div className="sticky top-0 z-50 -mx-4 px-4 sm:-mx-8 sm:px-8 py-3 bg-white/70 backdrop-blur-lg border-b border-slate-100 flex gap-2 overflow-x-auto scrollbar-none shadow-xs">
+        {sections.map((sec) => (
+          <button
+            key={sec.id}
+            onClick={() => scrollToSection(sec.id)}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold whitespace-nowrap transition-all duration-300 ${
+              activeSection === sec.id
+                ? "bg-blue-600 text-white shadow-sm scale-105"
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100"
+            }`}
+          >
+            {sec.label}
+          </button>
+        ))}
       </div>
 
-      {/* Principal Card */}
-      <div className="rounded-[28px] border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-6 sm:p-8 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-3xl font-black">
-            G
+      {/* SECTION 1: College Overview */}
+      <section id="overview" className="scroll-mt-28 space-y-8">
+        {/* College Identity Banner */}
+        <div className="rounded-[32px] overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-blue-800 p-8 sm:p-12 text-white relative shadow-md">
+          <div className="absolute top-0 right-0 h-40 w-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-200">Established in 1999 · Managed by Directorate of Technical Education</p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-2 leading-tight">Government Polytechnic College Kaduthuruthy</h2>
+          <p className="mt-4 text-sm sm:text-base text-blue-150 leading-relaxed max-w-2xl font-light">
+            Approved by AICTE and governed under the Directorate of Technical Education, Thiruvananthapuram, Government of Kerala. GPC Kaduthuruthy has emerged as a premier centre of professional diploma training, nurturing technical talent from rural communities with modern computing labs, electronics labs, hardware workshops, and expert faculty.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🏫 438+ Students</span>
+            <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">🎓 3 Departments</span>
+            <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">📍 Kaduthuruthy, Kottayam</span>
+            <span className="bg-white/15 rounded-full px-3 py-1.5 text-xs font-bold">☎️ 04829 295131</span>
           </div>
-          <div className="flex-1">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600">Principal</p>
-            <h3 className="mt-1 text-lg font-extrabold text-slate-800">Geetha C.M</h3>
-            <p className="mt-2 text-sm text-slate-500 font-medium leading-relaxed">
-              Welcome to Government Polytechnic College Kaduthuruthy. Our institution is committed to moulding students, mainly from the rural community, into future professionals who are also model citizens of the nation. We employ modern infrastructure with innovative teaching methods to prepare students for industry requirements and modern technology trends.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">📧 principal@gpckaduthuruthy.ac.in</span>
-              <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">☎️ 04829 295131</span>
+
+          <div className="mt-6 flex flex-wrap gap-4 text-xs font-bold text-blue-100 border-t border-white/10 pt-6">
+            <span className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+              <MapPin className="h-4 w-4 shrink-0" />
+              Kaduthuruthy, Kottayam, Kerala 686604
+            </span>
+            <span className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+              <Mail className="h-4 w-4 shrink-0" />
+              gptckaduthuruthy@gmail.com
+            </span>
+            <span className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10">
+              <Phone className="h-4 w-4 shrink-0" />
+              04829 295131
+            </span>
+          </div>
+        </div>
+
+        {/* Principal Card */}
+        <div className="rounded-[28px] border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-50 p-6 sm:p-8 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-3xl font-black shadow-xs overflow-hidden">
+              <img
+                src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&h=300&q=80"
+                alt="Principal Geetha C.M"
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600">Principal</p>
+              <h3 className="mt-1 text-lg font-extrabold text-slate-800">Geetha C.M</h3>
+              <p className="mt-2 text-sm text-slate-600 font-medium leading-relaxed">
+                Welcome to Government Polytechnic College Kaduthuruthy. Our institution is committed to moulding students, mainly from the rural community, into future professionals who are also model citizens of the nation. We employ modern infrastructure with innovative teaching methods to prepare students for industry requirements and modern technology trends.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">📧 principal@gpckaduthuruthy.ac.in</span>
+                <span className="text-xs bg-white rounded-lg px-3 py-1.5 font-bold text-slate-600 border border-amber-100">☎️ 04829 295131</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Vision & Mission — Official Text */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Core Pillars */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Our Core Pillars</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {coreValues.map((v, idx) => {
+              const Icon = v.icon;
+              return (
+                <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-2xs">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h4 className="mt-3 text-xs font-bold text-slate-800">{v.title}</h4>
+                  <p className="mt-1 text-xs text-slate-400 font-medium leading-relaxed">{v.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2: Vision & Mission */}
+      <section id="vision-mission" className="scroll-mt-28 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="rounded-[28px] border border-blue-50 bg-white p-8 shadow-xs">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
             <Compass className="h-5.5 w-5.5" />
@@ -104,316 +287,306 @@ export function AboutView() {
             </li>
           </ul>
         </div>
-      </div>
+      </section>
 
-      {/* Core Values */}
-      <div className="space-y-4">
-        <h3 className="text-md font-extrabold text-slate-800">Our Core Pillars</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {coreValues.map((v, idx) => {
-            const Icon = v.icon;
-            return (
-              <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-2xs">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h4 className="mt-3 text-xs font-bold text-slate-800">{v.title}</h4>
-                <p className="mt-1 text-xs text-slate-400 font-medium leading-relaxed">{v.description}</p>
-              </div>
-            );
-          })}
+      {/* SECTION 3: Departments */}
+      <section id="departments" className="scroll-mt-28 space-y-6">
+        <div>
+          <h3 className="text-md font-extrabold text-slate-800 tracking-tight">Academic Departments</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-1">Our specialized diploma courses approved by AICTE and affiliated to the State Board of Technical Education.</p>
         </div>
-      </div>
-
-      {/* Campus Facilities Preview */}
-      <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-6">
-        <h3 className="text-sm font-bold text-slate-800">Available Campus Infrastructure</h3>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold text-slate-600">
-          {[
-            "Central Library",
-            "Computer Labs",
-            "Electronics Labs",
-            "Hardware Labs",
-            "Language Lab",
-            "Placement Cell",
-            "NSS & NCC Units",
-            "Auditorium",
-          ].map((f, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-2xs border border-slate-100">
-              <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
-              <span>{f}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {displayDepartments.map((dept) => (
+            <div key={dept.id} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-2xs flex flex-col justify-between hover:shadow-xs transition duration-300">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">
+                    {dept.code}
+                  </span>
+                  <span className="text-[10px] font-extrabold text-slate-400">
+                    👨‍🎓 {dept.studentCount} Students
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-800 leading-tight">{dept.name}</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium mt-2">{dept.overview}</p>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-50 flex items-center gap-3">
+                <img
+                  src={dept.hodPhoto || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80"}
+                  alt={dept.hodName}
+                  className="h-10 w-10 rounded-full object-cover border border-slate-100 shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HOD</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{dept.hodName}</p>
+                  <p className="text-[10px] text-blue-600 font-bold truncate">{dept.hodEmail}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-
-/* ==========================================================================
-   FACILITIES VIEW
-   ========================================================================== */
-export function FacilitiesView() {
-  const facilities = [
-    { name: "Central Library", desc: "Over 11,000 reference books, IEEE journals, digital reading section, and previous year question banks.", icon: "📚", color: "bg-blue-50 border-blue-100" },
-    { name: "Computer Labs", desc: "High-speed fiber-connected computing centres with modern workstations for programming, networking, and AI.", icon: "🖥️", color: "bg-indigo-50 border-indigo-100" },
-    { name: "Electronics Labs", desc: "VLSI design, microcontroller interfacing, communication engineering, and analog circuit labs.", icon: "⚡", color: "bg-yellow-50 border-yellow-100" },
-    { name: "Hardware Labs", desc: "Digital electronics interfacing, PC hardware diagnostics, peripheral interfacing and maintenance stations.", icon: "🔧", color: "bg-orange-50 border-orange-100" },
-    { name: "IT Infrastructure", desc: "Campus-wide high-speed internet, LAN connectivity, and dedicated server infrastructure.", icon: "🌐", color: "bg-cyan-50 border-cyan-100" },
-    { name: "Sports Facilities", desc: "Outdoor sports ground, cricket, football, volleyball courts, and indoor games area.", icon: "🏏", color: "bg-green-50 border-green-100" },
-    { name: "NSS Activities", desc: "National Service Scheme unit conducting community service, afforestation drives, blood donation camps, and flood relief.", icon: "🤝", color: "bg-teal-50 border-teal-100" },
-    { name: "NCC Activities", desc: "National Cadet Corps unit building discipline, leadership, and national spirit among students.", icon: "🎖️", color: "bg-emerald-50 border-emerald-100" },
-    { name: "Language Lab", desc: "Dedicated English language communication lab to develop professional communication and presentation skills.", icon: "🗣️", color: "bg-purple-50 border-purple-100" },
-    { name: "Finishing School", desc: "Personality development, soft skills training, and interview preparation workshops.", icon: "🎓", color: "bg-pink-50 border-pink-100" },
-    { name: "Placement Cell", desc: "Active placement cell connecting students with top companies through campus drives and recruitment fairs.", icon: "💼", color: "bg-slate-50 border-slate-200" },
-    { name: "Career Guidance Cell", desc: "Expert counselling for higher education, competitive exams, and career path planning.", icon: "🧭", color: "bg-amber-50 border-amber-100" },
-    { name: "Canteen", desc: "Hygienic and affordable canteen providing healthy meals and refreshments to students and staff.", icon: "🍱", color: "bg-lime-50 border-lime-100" },
-    { name: "Auditorium", desc: "Large auditorium for college functions, seminars, cultural programs, and annual TECHNOFILA events.", icon: "🎭", color: "bg-rose-50 border-rose-100" },
-    { name: "Cooperative Society", desc: "Student cooperative providing stationery, books, and essential supplies at subsidised prices.", icon: "🏪", color: "bg-sky-50 border-sky-100" },
-    { name: "Innovation Activities", desc: "ISTE chapter, hackathons, project expos, robotics workshops, and TECHNOFILA technical symposium.", icon: "💡", color: "bg-violet-50 border-violet-100" },
-  ];
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="rounded-3xl bg-gradient-to-r from-emerald-600 to-teal-600 p-6 sm:p-8 text-white shadow-xs">
-        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Campus Facilities</h2>
-        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed max-w-2xl font-medium">
-          Government Polytechnic College Kaduthuruthy is equipped with modern facilities to support academic excellence, co-curricular activities, and holistic student development.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">16 Facilities</span>
-          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">3 Engineering Labs</span>
-          <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold">NSS · NCC · ISTE</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {facilities.map((f, i) => (
-          <div key={i} className={`rounded-2xl border p-5 ${f.color} shadow-2xs hover:shadow-xs transition`}>
-            <span className="text-3xl">{f.icon}</span>
-            <h4 className="mt-3 text-sm font-bold text-slate-800">{f.name}</h4>
-            <p className="mt-1.5 text-xs text-slate-500 font-medium leading-relaxed">{f.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-/* ==========================================================================
-   PLACEMENT VIEW
-   ========================================================================== */
-export function PlacementView() {
-  const companies = [
-    { name: "Tata Consultancy Services", role: "Systems Engineer", type: "IT" },
-    { name: "Keltron", role: "Junior Engineer", type: "PSU" },
-    { name: "Wipro Technologies", role: "Project Engineer", type: "IT" },
-    { name: "Infopark Kochi Startups", role: "Technical Support", type: "IT" },
-    { name: "Technopark Trivandrum", role: "Hardware Engineer", type: "IT" },
-    { name: "BSNL Kerala", role: "Technical Assistant", type: "PSU" },
-  ];
-
-  const activities = [
-    "Resume building and professional profile workshops",
-    "Mock interviews with industry professionals",
-    "Soft skills and communication training sessions",
-    "Industry readiness and aptitude test preparation",
-    "Campus recruitment drives by top companies",
-    "Career counselling and higher education guidance",
-  ];
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 p-6 sm:p-8 text-white shadow-xs">
-        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Placement & Career Guidance</h2>
-        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed font-medium max-w-2xl">
-          The Career Guidance & Placement Cell (CGPC) at GPC Kaduthuruthy actively connects students with top industry recruiters and prepares them for successful careers.
-        </p>
-      </div>
-
-      {/* 100% Placement Achievement Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-500 p-6 text-white flex items-center gap-4 shadow-lg">
-        <span className="text-5xl">🏆</span>
+      {/* SECTION 4: Facilities */}
+      <section id="facilities" className="scroll-mt-28 space-y-6">
         <div>
-          <p className="text-xl font-black tracking-tight">100% Placement Achievement</p>
-          <p className="text-sm font-bold text-white/90 mt-0.5">Academic Year 2025–26 · Government Polytechnic College Kaduthuruthy</p>
+          <h3 className="text-md font-extrabold text-slate-800 tracking-tight">Campus Facilities</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-1">Explore our student-centric academic, physical, and co-curricular infrastructure designed for excellence.</p>
         </div>
-      </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {facilities.map((f, i) => (
+            <div key={i} className={`rounded-2xl border p-5 ${f.color} shadow-2xs hover:shadow-xs transition duration-300`}>
+              <span className="text-3xl">{f.icon}</span>
+              <h4 className="mt-3 text-sm font-bold text-slate-800">{f.name}</h4>
+              <p className="mt-1.5 text-xs text-slate-500 font-medium leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Recruiting Companies */}
-        <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs">
-          <h3 className="text-sm font-extrabold text-slate-800 mb-4">Recruiting Partners</h3>
-          <div className="space-y-3">
-            {companies.map((c, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div>
-                  <p className="text-xs font-bold text-slate-800">{c.name}</p>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{c.role}</p>
+      {/* SECTION 5: Placement Cell */}
+      <section id="placement" className="scroll-mt-28 space-y-6">
+        <div>
+          <h3 className="text-md font-extrabold text-slate-800 tracking-tight">Placement & Career Guidance</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-1">Connecting diploma graduates to major tech recruiters and corporate career opportunities.</p>
+        </div>
+
+        {/* 100% Placement Achievement Banner */}
+        <div className="rounded-3xl bg-gradient-to-r from-emerald-500 to-teal-500 p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center sm:justify-between gap-4 shadow-md">
+          <div className="flex items-center gap-4">
+            <span className="text-5xl">🏆</span>
+            <div>
+              <h4 className="text-lg font-black tracking-tight">100% Placement Achievement</h4>
+              <p className="text-xs font-bold text-emerald-100 mt-1">Academic Year 2025–26 · Government Polytechnic College Kaduthuruthy</p>
+            </div>
+          </div>
+          <div className="shrink-0 text-center sm:text-right bg-white/10 px-4 py-2 rounded-2xl border border-white/10">
+            <p className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Avg Salary Package</p>
+            <p className="text-xl font-extrabold">₹3.2 Lakhs/year</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Recruiting Companies */}
+          <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs">
+            <h4 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-indigo-600" /> Recruiting Partners
+            </h4>
+            <div className="space-y-3">
+              {companies.map((c, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition">
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">{c.name}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{c.role}</p>
+                  </div>
+                  <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg ${
+                    c.type === "PSU" ? "bg-blue-50 text-blue-700" : "bg-violet-50 text-violet-700"
+                  }`}>{c.type}</span>
                 </div>
-                <span className={`text-[10px] font-extrabold px-2 py-1 rounded-lg ${
-                  c.type === "PSU" ? "bg-blue-50 text-blue-700" : "bg-violet-50 text-violet-700"
-                }`}>{c.type}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Career Guidance Activities */}
+          <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs flex flex-col justify-between">
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Career Guidance Activities
+              </h4>
+              <div className="space-y-2.5">
+                {activities.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <p className="text-xs font-medium text-slate-600 leading-relaxed">{a}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div className="mt-5 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+              <p className="text-xs font-extrabold text-indigo-850">Placement Cell Contact</p>
+              <p className="text-xs text-indigo-600 font-semibold mt-1">📞 Phone: 04829 295131</p>
+              <p className="text-xs text-indigo-600 font-semibold">📧 Email: cgpc@gpckaduthuruthy.ac.in</p>
+            </div>
           </div>
         </div>
 
-        {/* Career Guidance Activities */}
-        <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-xs">
-          <h3 className="text-sm font-extrabold text-slate-800 mb-4">Career Guidance Activities</h3>
-          <div className="space-y-2.5">
-            {activities.map((a, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                <p className="text-xs font-medium text-slate-600 leading-relaxed">{a}</p>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "Placement Rate", value: "100%", sub: "2025-26", color: "text-emerald-600" },
+            { label: "Recruiting Companies", value: "15+", sub: "Annually", color: "text-blue-600" },
+            { label: "Avg. Package", value: "₹3.2L", sub: "Per Annum", color: "text-violet-600" },
+            { label: "Students Placed", value: "60+", sub: "This Year", color: "text-amber-600" },
+          ].map((s, i) => (
+            <div key={i} className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-2xs hover:shadow-xs transition duration-300">
+              <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+              <p className="text-xs font-bold text-slate-700 mt-1">{s.label}</p>
+              <p className="text-[10px] text-slate-400 font-semibold">{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 6: Contact Information */}
+      <section id="contact" className="scroll-mt-28 space-y-6">
+        <div>
+          <h3 className="text-md font-extrabold text-slate-800 tracking-tight">Contact Information</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-1">Connect with our office staff and locate the campus for inquiries and visits.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Contact Details Card */}
+          <div className="rounded-[28px] border border-slate-100 bg-white p-6 sm:p-8 shadow-xs space-y-5 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <GraduationCap className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">Government Polytechnic College Kaduthuruthy</p>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Managed by Directorate of Technical Education, Thiruvananthapuram</p>
+                </div>
               </div>
-            ))}
+
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <MapPin className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">Location</p>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Kaduthuruthy, Kottayam, Kerala 686604</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                  <Phone className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">Phone</p>
+                  <a href="tel:04829295131" className="text-xs text-green-600 font-bold hover:underline">04829 295131</a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <Mail className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">Email</p>
+                  <a href="mailto:gptckaduthuruthy@gmail.com" className="text-xs text-indigo-600 font-bold hover:underline">gptckaduthuruthy@gmail.com</a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <ExternalLink className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">Official Website</p>
+                  <a href="https://gpckaduthuruthy.ac.in" target="_blank" rel="noreferrer" className="text-xs text-purple-600 font-bold hover:underline">gpckaduthuruthy.ac.in</a>
+                </div>
+              </div>
+            </div>
+
+            <a
+              href="https://maps.google.com/?q=Government+Polytechnic+College+Kaduthuruthy"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-3 transition active:scale-95 shadow-xs"
+            >
+              <MapPin className="h-4 w-4" />
+              Get Directions on Google Maps
+            </a>
           </div>
 
-          <div className="mt-5 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-            <p className="text-xs font-extrabold text-indigo-800">Placement Cell Contact</p>
-            <p className="text-xs text-indigo-600 font-semibold mt-1">📞 04829 295131</p>
-            <p className="text-xs text-indigo-600 font-semibold">🌐 gpckaduthuruthy.ac.in</p>
+          {/* Map Embed */}
+          <div className="rounded-[28px] overflow-hidden border border-slate-100 shadow-xs min-h-[300px]">
+            <iframe
+              title="GPC Kaduthuruthy Map"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3930.123456789!2d76.680!3d9.660!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b07e0d0e0d0e0d0%3A0x1234567890abcdef!2sGovernment+Polytechnic+College+Kaduthuruthy!5e0!3m2!1sen!2sin!4v1234567890"
+              width="100%"
+              height="100%"
+              style={{ border: 0, minHeight: "300px" }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
         </div>
-      </div>
 
-      {/* Placement Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Placement Rate", value: "100%", sub: "2025-26", color: "text-emerald-600" },
-          { label: "Recruiting Companies", value: "15+", sub: "Annually", color: "text-blue-600" },
-          { label: "Avg. Package", value: "₹3.2L", sub: "Per Annum", color: "text-violet-600" },
-          { label: "Students Placed", value: "60+", sub: "This Year", color: "text-amber-600" },
-        ].map((s, i) => (
-          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-2xs">
-            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-            <p className="text-xs font-bold text-slate-700 mt-1">{s.label}</p>
-            <p className="text-[10px] text-slate-400 font-semibold">{s.sub}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+        {/* Quick Info Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "Established", value: "1999", icon: "🏛️" },
+            { label: "Courses", value: "3 Diplomas", icon: "📋" },
+            { label: "Students", value: "438+", icon: "🎓" },
+            { label: "Institution Code", value: "60 (DTE)", icon: "🔖" },
+          ].map((info, i) => (
+            <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+              <span className="text-2xl">{info.icon}</span>
+              <p className="mt-2 text-sm font-black text-slate-800">{info.value}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{info.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
+      {/* SECTION 7: Campus Gallery */}
+      <section id="gallery" className="scroll-mt-28 space-y-6">
+        <div>
+          <h3 className="text-md font-extrabold text-slate-800 tracking-tight">Campus Gallery</h3>
+          <p className="text-xs text-slate-400 font-semibold mt-1">Snapshots of life, learning, and infrastructure at GPC Kaduthuruthy.</p>
+        </div>
 
-/* ==========================================================================
-   CONTACT VIEW
-   ========================================================================== */
-export function ContactView() {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="rounded-3xl bg-gradient-to-r from-slate-800 to-slate-700 p-6 sm:p-8 text-white shadow-xs">
-        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">Contact Us</h2>
-        <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed font-medium">
-          Government Polytechnic College Kaduthuruthy — Reach us for admissions, academic queries, and general information.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Contact Card */}
-        <div className="rounded-[28px] border border-slate-100 bg-white p-6 sm:p-8 shadow-xs space-y-5">
-          <h3 className="text-sm font-extrabold text-slate-800">Contact Information</h3>
-
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <GraduationCap className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <p className="text-xs font-extrabold text-slate-800">Government Polytechnic College Kaduthuruthy</p>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Managed by Directorate of Technical Education, Thiruvananthapuram</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {galleryImages.map((img, i) => (
+            <div
+              key={i}
+              onClick={() => setSelectedGalleryImage(img.url)}
+              className="group relative rounded-2xl overflow-hidden border border-slate-100 shadow-2xs cursor-pointer aspect-video bg-slate-50 transition-all duration-300 hover:shadow-md hover:border-blue-100"
+            >
+              <img
+                src={img.url}
+                alt={img.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 flex flex-col justify-end">
+                <span className="text-[9px] font-black bg-blue-600 text-white uppercase px-1.5 py-0.5 rounded-md w-max mb-1">
+                  {img.category}
+                </span>
+                <p className="text-[10px] font-bold text-white truncate">{img.title}</p>
               </div>
             </div>
+          ))}
+        </div>
+      </section>
 
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                <MapPin className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <p className="text-xs font-extrabold text-slate-800">Location</p>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">Kaduthuruthy, Kottayam, Kerala 686604</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                <Phone className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <p className="text-xs font-extrabold text-slate-800">Phone</p>
-                <a href="tel:04829295131" className="text-xs text-green-600 font-bold hover:underline">04829 295131</a>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                <Mail className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <p className="text-xs font-extrabold text-slate-800">Email</p>
-                <a href="mailto:gptckaduthuruthy@gmail.com" className="text-xs text-indigo-600 font-bold hover:underline">gptckaduthuruthy@gmail.com</a>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                <ExternalLink className="h-4.5 w-4.5" />
-              </span>
-              <div>
-                <p className="text-xs font-extrabold text-slate-800">Official Website</p>
-                <a href="https://gpckaduthuruthy.ac.in" target="_blank" rel="noreferrer" className="text-xs text-purple-600 font-bold hover:underline">gpckaduthuruthy.ac.in</a>
-              </div>
-            </div>
-          </div>
-
-          <a
-            href="https://maps.google.com/?q=Government+Polytechnic+College+Kaduthuruthy"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-3 transition active:scale-95"
+      {/* LIGHTBOX MODAL */}
+      {selectedGalleryImage && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <button
+            onClick={() => setSelectedGalleryImage(null)}
+            className="absolute top-4 right-4 text-white hover:text-slate-300 p-2 bg-slate-800/50 hover:bg-slate-800/80 rounded-full transition"
+            title="Close"
           >
-            <MapPin className="h-4 w-4" />
-            Get Directions on Google Maps
-          </a>
-        </div>
-
-        {/* Map Embed */}
-        <div className="rounded-[28px] overflow-hidden border border-slate-100 shadow-xs min-h-[300px]">
-          <iframe
-            title="GPC Kaduthuruthy Map"
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3930.123456789!2d76.680!3d9.660!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b07e0d0e0d0e0d0%3A0x1234567890abcdef!2sGovernment+Polytechnic+College+Kaduthuruthy!5e0!3m2!1sen!2sin!4v1234567890"
-            width="100%"
-            height="100%"
-            style={{ border: 0, minHeight: "300px" }}
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        </div>
-      </div>
-
-      {/* Quick Info Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "Established", value: "1999", icon: "🏛️" },
-          { label: "Courses", value: "3 Diplomas", icon: "📋" },
-          { label: "Students", value: "438+", icon: "🎓" },
-          { label: "Institution Code", value: "60 (DTE)", icon: "🔖" },
-        ].map((info, i) => (
-          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-            <span className="text-2xl">{info.icon}</span>
-            <p className="mt-2 text-sm font-black text-slate-800">{info.value}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{info.label}</p>
+            <X className="h-6 w-6" />
+          </button>
+          <div
+            className="relative max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={selectedGalleryImage}
+              alt="Campus View"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+            />
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -605,7 +778,14 @@ export function StudentsView({ students, departments, studentRequests = [] }: St
         reviewedDate: "",
         adminRemarks: ""
       });
-
+// Send email notification to admins
+await sendEmailNotification("request", {
+  name: requesterName.trim(),
+  email: requesterEmail.trim(),
+  phone: requesterPhone.trim(),
+  details: reqPurpose.trim(),
+  timestamp: nowISO,
+});
       setSuccessMsg("Your request has been submitted successfully. The college administration will review your request and update you through your Email or WhatsApp within one week.");
       setRequesterName("");
       setRequesterPhone("");
@@ -931,17 +1111,41 @@ export function StudentsView({ students, departments, studentRequests = [] }: St
    ========================================================================== */
 interface BloodBankViewProps {
   donors: BloodDonor[];
+  outsiderDonors?: OutsiderBloodDonor[];
 }
 
-export function BloodBankView({ donors }: BloodBankViewProps) {
+export function BloodBankView({ donors, outsiderDonors = [] }: BloodBankViewProps) {
+  // Navigation tabs: 'student' | 'external'
+  const [activeBankTab, setActiveBankTab] = useState<"student" | "external">("student");
+
+  // Existing student filters
   const [bloodQuery, setBloodQuery] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
   const [semFilter, setSemFilter] = useState("all");
   const [placeFilter, setPlaceFilter] = useState("");
   const [availFilter, setAvailFilter] = useState("all");
 
+  // New external donor filters
+  const [extBloodQuery, setExtBloodQuery] = useState("all");
+  const [extPlaceFilter, setExtPlaceFilter] = useState("");
+  const [extDistrictFilter, setExtDistrictFilter] = useState("");
+
+  // Registration form modal state
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regWhatsapp, setRegWhatsapp] = useState("");
+  const [regBlood, setRegBlood] = useState("O+");
+  const [regPlace, setRegPlace] = useState("");
+  const [regDistrict, setRegDistrict] = useState("");
+  const [regAge, setRegAge] = useState("");
+  const [regGender, setRegGender] = useState("");
+  const [regSubmitting, setRegSubmitting] = useState(false);
+  const [regSuccess, setRegSuccess] = useState("");
+
   // Phone request modal state
-  const [requestDonor, setRequestDonor] = useState<BloodDonor | null>(null);
+  const [requestDonor, setRequestDonor] = useState<any | null>(null);
+  const [isExternalRequest, setIsExternalRequest] = useState(false);
   const [reqName, setReqName] = useState("");
   const [reqPhone, setReqPhone] = useState("");
   const [reqEmail, setReqEmail] = useState("");
@@ -968,8 +1172,8 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
         requesterName: reqName,
         requesterEmail: reqEmail,
         requesterPhone: reqPhone,
-        purpose: `Blood Donor Phone Request — ${requestDonor.bloodGroup}`,
-        department: requestDonor.departmentId,
+        purpose: `Blood Donor Phone Request (${isExternalRequest ? "External" : "Student"}) — ${requestDonor.bloodGroup}`,
+        department: isExternalRequest ? "External" : (requestDonor.departmentId || "general"),
         requestedInformation: ["Phone Number"],
         reasonForRequest: `Emergency blood contact request for donor ${requestDonor.name} (${requestDonor.bloodGroup}).`,
         additionalNotes: reqNote,
@@ -988,6 +1192,50 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
     }
   };
 
+  const handleRegisterOutsider = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName || !regPhone || !regWhatsapp || !regBlood || !regPlace || !regDistrict) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    setRegSubmitting(true);
+    setRegSuccess("");
+    try {
+      const generatedId = `req_${Date.now()}`;
+      const docData: any = {
+        id: generatedId,
+        name: regName.trim(),
+        phone: regPhone.trim(),
+        whatsapp: regWhatsapp.trim(),
+        bloodGroup: regBlood,
+        place: regPlace.trim(),
+        district: regDistrict.trim(),
+        status: "Pending",
+        createdAt: new Date().toISOString()
+      };
+      if (regAge) {
+        docData.age = parseInt(regAge);
+      }
+      if (regGender) {
+        docData.gender = regGender;
+      }
+      await setDoc(doc(db, "outsiderBloodDonorRequests", generatedId), docData);
+      setRegSuccess("Your blood donor registration has been submitted successfully and is awaiting approval.");
+      setRegName("");
+      setRegPhone("");
+      setRegWhatsapp("");
+      setRegPlace("");
+      setRegDistrict("");
+      setRegAge("");
+      setRegGender("");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Registration failed: ${err.message || err}`);
+    } finally {
+      setRegSubmitting(false);
+    }
+  };
+
   const filteredDonors = donors.filter((d) => {
     const matchesBlood = bloodQuery === "all" || d.bloodGroup.toUpperCase() === bloodQuery.toUpperCase();
     const matchesDept = deptFilter === "all" || d.departmentId === deptFilter;
@@ -995,6 +1243,13 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
     const matchesPlace = !placeFilter || (d.place && d.place.toLowerCase().includes(placeFilter.toLowerCase()));
     const matchesAvail = availFilter === "all" || (availFilter === "active" ? d.isAvailable : !d.isAvailable);
     return matchesBlood && matchesDept && matchesSem && matchesPlace && matchesAvail;
+  });
+
+  const filteredExtDonors = outsiderDonors.filter((d) => {
+    const matchesBlood = extBloodQuery === "all" || d.bloodGroup.toUpperCase() === extBloodQuery.toUpperCase();
+    const matchesPlace = !extPlaceFilter || (d.place && d.place.toLowerCase().includes(extPlaceFilter.toLowerCase()));
+    const matchesDistrict = !extDistrictFilter || (d.district && d.district.toLowerCase().includes(extDistrictFilter.toLowerCase()));
+    return matchesBlood && matchesPlace && matchesDistrict;
   });
 
   return (
@@ -1106,122 +1361,395 @@ export function BloodBankView({ donors }: BloodBankViewProps) {
       <div className="rounded-3xl bg-linear-to-r from-red-550 to-red-650 p-6 sm:p-8 text-white shadow-xs">
         <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">On-Campus Emergency Blood Bank</h2>
         <p className="mt-2 text-xs sm:text-sm text-white/85 leading-relaxed max-w-2xl font-medium font-sans">
-          Welcome to the Govt Polytechnic College Kaduthuruthy student donor registry. Filter and search for active student contributors across departments and semesters for safe local emergency planning.
+          Welcome to the Govt Polytechnic College Kaduthuruthy emergency blood donor registry. Access student and external donor registries for safe local emergency planning.
         </p>
       </div>
 
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-white p-4 rounded-2xl border border-slate-100">
-        <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Blood Group</label>
-          <select
-            value={bloodQuery}
-            onChange={(e) => setBloodQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Tab buttons */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl w-fit">
+          <button
+            onClick={() => setActiveBankTab("student")}
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition ${
+              activeBankTab === "student"
+                ? "bg-white text-slate-800 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
           >
-            <option value="all">All Groups</option>
-            {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => <option key={bg} value={bg}>{bg}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Department</label>
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+            Student Donors
+          </button>
+          <button
+            onClick={() => setActiveBankTab("external")}
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition ${
+              activeBankTab === "external"
+                ? "bg-white text-slate-800 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
           >
-            <option value="all">All Departments</option>
-            <option value="computer">Computer Engineering</option>
-            <option value="hardware">Computer Hardware Engg</option>
-            <option value="electronics">Electronics Engineering</option>
-          </select>
+            External Donors
+          </button>
         </div>
 
-        <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Semester</label>
-          <select
-            value={semFilter}
-            onChange={(e) => setSemFilter(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
-          >
-            <option value="all">All Semesters</option>
-            {["1", "2", "3", "4", "5", "6"].map(s => <option key={s} value={s}>Semester {s}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Place / City</label>
-          <input
-            type="text"
-            value={placeFilter}
-            onChange={(e) => setPlaceFilter(e.target.value)}
-            placeholder="Search Place (e.g. Kottayam)"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-650 outline-none placeholder-slate-400"
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Availability</label>
-          <select
-            value={availFilter}
-            onChange={(e) => setAvailFilter(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
-          >
-            <option value="all">All Donors</option>
-            <option value="active">Active Available</option>
-            <option value="inactive">Away</option>
-          </select>
-        </div>
+        {/* Register Button (Only for non-students) */}
+        <button
+          onClick={() => { setShowRegModal(true); setRegSuccess(""); }}
+          className="rounded-xl bg-red-600 hover:bg-red-750 text-white text-xs font-extrabold px-5 py-2.5 transition active:scale-95 shadow-2xs uppercase tracking-wider"
+        >
+          Register as Blood Donor
+        </button>
       </div>
 
-      {filteredDonors.length === 0 ? (
-        <div className="rounded-[28px] border border-dashed border-red-100 bg-white p-10 text-center space-y-2">
-          <p className="text-sm font-extrabold text-slate-700">No student donors found matching your exact filters.</p>
-          <p className="text-xs text-slate-400 font-semibold font-sans">Try widening your filters or location search term.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDonors.map((d) => (
-            <div
-              key={d.id}
-              className="rounded-2xl border border-slate-100 bg-white p-5 hover:border-red-100 shadow-2xs hover:shadow-xs transition duration-300 relative overflow-hidden"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">{d.name}</h4>
-                  <p className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wide leading-none">
-                    Sem {d.semester} • {d.departmentId === "computer" ? "Computer Engg" : d.departmentId === "hardware" ? "Hardware Engg" : "Electronics Engg"}
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 mt-2">
-                    📍 Place: {d.place || "N/A"}
-                  </p>
+      {/* Note under registration */}
+      <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100 text-xs text-amber-800 leading-relaxed font-medium">
+        ⚠️ <strong>Note:</strong> For GPTC students, blood donor information is managed automatically. This registration is only for external donors (alumni, faculty, parents, local residents, volunteers, friends of students, etc.).
+      </div>
 
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${d.isAvailable ? "bg-green-500 animate-pulse" : "bg-slate-300"}`} />
-                    <span className="text-[11px] font-bold text-slate-500">
-                      {d.isAvailable ? "Emergency Active" : "Away / Engaged"}
-                    </span>
+      {activeBankTab === "student" ? (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-white p-4 rounded-2xl border border-slate-100">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Blood Group</label>
+              <select
+                value={bloodQuery}
+                onChange={(e) => setBloodQuery(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="all">All Groups</option>
+                {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => <option key={bg} value={bg}>{bg}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Department</label>
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="all">All Departments</option>
+                <option value="computer">Computer Engineering</option>
+                <option value="hardware">Computer Hardware Engg</option>
+                <option value="electronics">Electronics Engineering</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Semester</label>
+              <select
+                value={semFilter}
+                onChange={(e) => setSemFilter(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="all">All Semesters</option>
+                {["1", "2", "3", "4", "5", "6"].map(s => <option key={s} value={s}>Semester {s}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Place / City</label>
+              <input
+                type="text"
+                value={placeFilter}
+                onChange={(e) => setPlaceFilter(e.target.value)}
+                placeholder="Search Place (e.g. Kottayam)"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-650 outline-none placeholder-slate-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Availability</label>
+              <select
+                value={availFilter}
+                onChange={(e) => setAvailFilter(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="all">All Donors</option>
+                <option value="active">Active Available</option>
+                <option value="inactive">Away</option>
+              </select>
+            </div>
+          </div>
+
+          {filteredDonors.length === 0 ? (
+            <div className="rounded-[28px] border border-dashed border-red-100 bg-white p-10 text-center space-y-2 animate-fade-in">
+              <p className="text-sm font-extrabold text-slate-700">No student donors found matching your exact filters.</p>
+              <p className="text-xs text-slate-400 font-semibold font-sans">Try widening your filters or location search term.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+              {filteredDonors.map((d) => (
+                <div
+                  key={d.id}
+                  className="rounded-2xl border border-slate-100 bg-white p-5 hover:border-red-100 shadow-2xs hover:shadow-xs transition duration-300 relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{d.name}</h4>
+                      <p className="text-xs text-slate-400 font-bold uppercase mt-1 tracking-wide leading-none">
+                        Sem {d.semester} • {d.departmentId === "computer" ? "Computer Engg" : d.departmentId === "hardware" ? "Hardware Engg" : "Electronics Engg"}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-500 mt-2">
+                        📍 Place: {d.place || "N/A"}
+                      </p>
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${d.isAvailable ? "bg-green-500 animate-pulse" : "bg-slate-300"}`} />
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {d.isAvailable ? "Emergency Active" : "Away / Engaged"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600 text-sm font-extrabold border border-red-100/40">
+                        {d.bloodGroup}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Request Phone Number button */}
+                  <button
+                    onClick={() => { setRequestDonor(d); setIsExternalRequest(false); resetForm(); }}
+                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-extrabold py-2 transition active:scale-95"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    Request Phone Number
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-2xl border border-slate-100">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Blood Group</label>
+              <select
+                value={extBloodQuery}
+                onChange={(e) => setExtBloodQuery(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="all">All Groups</option>
+                {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => <option key={bg} value={bg}>{bg}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">Place / City</label>
+              <input
+                type="text"
+                value={extPlaceFilter}
+                onChange={(e) => setExtPlaceFilter(e.target.value)}
+                placeholder="Search Place (e.g. Kaduthuruthy)"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-650 outline-none placeholder-slate-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1">District</label>
+              <input
+                type="text"
+                value={extDistrictFilter}
+                onChange={(e) => setExtDistrictFilter(e.target.value)}
+                placeholder="Search District (e.g. Kottayam)"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-650 outline-none placeholder-slate-400"
+              />
+            </div>
+          </div>
+
+          {filteredExtDonors.length === 0 ? (
+            <div className="rounded-[28px] border border-dashed border-red-100 bg-white p-10 text-center space-y-2 animate-fade-in">
+              <p className="text-sm font-extrabold text-slate-700">No external donors found matching your exact filters.</p>
+              <p className="text-xs text-slate-400 font-semibold font-sans">Try widening your filters or location search terms.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+              {filteredExtDonors.map((d) => (
+                <div
+                  key={d.id}
+                  className="rounded-2xl border border-slate-100 bg-white p-5 hover:border-red-100 shadow-2xs hover:shadow-xs transition duration-300 relative overflow-hidden"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{d.name}</h4>
+                      <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md inline-block mt-1 leading-none">
+                        External Donor
+                      </span>
+                      <p className="text-xs font-semibold text-slate-500 mt-2">
+                        📍 Place: {d.place || "N/A"}, {d.district || "N/A"}
+                      </p>
+                      {(d.age || d.gender) && (
+                        <p className="text-[10px] text-slate-400 font-bold mt-1.5 uppercase leading-none">
+                          {d.age ? `Age: ${d.age} ` : ""}{d.gender ? `• ${d.gender}` : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-650 text-sm font-extrabold border border-red-100/40">
+                        {d.bloodGroup}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Request Phone Number button */}
+                  <button
+                    onClick={() => { setRequestDonor(d); setIsExternalRequest(true); resetForm(); }}
+                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-extrabold py-2 transition active:scale-95"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                    Request Phone Number
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Outsider Donor Registration Modal */}
+      {showRegModal && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full relative border border-slate-100 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-md font-black text-slate-800 tracking-tight">Register as Blood Donor</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-1">This registration is only for external, non-student donors.</p>
+              </div>
+              <button onClick={() => setShowRegModal(false)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {regSuccess ? (
+              <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold leading-relaxed text-center text-emerald-800 space-y-2">
+                <p>{regSuccess}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowRegModal(false)}
+                  className="mt-3 rounded-xl bg-slate-800 text-white px-5 py-2 text-xs font-bold hover:bg-slate-900 transition"
+                >Close</button>
+              </div>
+            ) : (
+              <form onSubmit={handleRegisterOutsider} className="space-y-4">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Full Name *</label>
+                    <input
+                      type="text" required value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Blood Group *</label>
+                    <select
+                      value={regBlood}
+                      onChange={(e) => setRegBlood(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-650 outline-none focus:bg-white font-sans"
+                    >
+                      {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => <option key={bg} value={bg}>{bg}</option>)}
+                    </select>
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center shrink-0">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600 text-sm font-extrabold border border-red-100/40">
-                    {d.bloodGroup}
-                  </span>
-                </div>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Phone Number *</label>
+                    <input
+                      type="tel" required value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      placeholder="e.g. +91 94455..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
 
-              {/* Request Phone Number button */}
-              <button
-                onClick={() => { setRequestDonor(d); resetForm(); }}
-                className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-extrabold py-2 transition active:scale-95"
-              >
-                <PhoneCall className="h-3.5 w-3.5" />
-                Request Phone Number
-              </button>
-            </div>
-          ))}
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">WhatsApp Number *</label>
+                    <input
+                      type="tel" required value={regWhatsapp}
+                      onChange={(e) => setRegWhatsapp(e.target.value)}
+                      placeholder="WhatsApp phone number"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Place / City *</label>
+                    <input
+                      type="text" required value={regPlace}
+                      onChange={(e) => setRegPlace(e.target.value)}
+                      placeholder="e.g. Kaduthuruthy"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">District *</label>
+                    <input
+                      type="text" required value={regDistrict}
+                      onChange={(e) => setRegDistrict(e.target.value)}
+                      placeholder="e.g. Kottayam"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Age (Optional)</label>
+                    <input
+                      type="number" value={regAge}
+                      onChange={(e) => setRegAge(e.target.value)}
+                      placeholder="e.g. 28"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-red-400 font-sans"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5 ml-1 font-sans">Gender (Optional)</label>
+                    <select
+                      value={regGender}
+                      onChange={(e) => setRegGender(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-650 outline-none focus:bg-white font-sans"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowRegModal(false)}
+                    className="rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-50 transition"
+                  >Cancel</button>
+                  <button
+                    type="submit" disabled={regSubmitting}
+                    className="rounded-xl bg-red-600 hover:bg-red-750 disabled:bg-red-400 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-1.5 font-sans"
+                  >
+                    {regSubmitting ? "Submitting..." : "Submit Registration"}
+                  </button>
+                </div>
+
+              </form>
+            )}
+
+          </motion.div>
         </div>
       )}
     </div>

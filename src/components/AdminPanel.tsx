@@ -14,16 +14,19 @@ import {
   deleteDoc, 
   doc, 
   setDoc,
-  updateDoc
+  updateDoc,
+  increment
 } from "firebase/firestore";
 import { auth, db, handleFirestoreError, OperationType } from "../firebase";
+import { sendEmailNotification } from "../utils/emailService";
 import { 
-  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, AttendanceRecord, Complaint 
+  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, AttendanceRecord, Complaint,
+  OutsiderBloodDonor, OutsiderBloodDonorRequest
 } from "../types";
 import { 
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
-  Search, Eye, X, Check, Filter, Clock, MessageSquare
+  Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -38,6 +41,17 @@ interface AdminPanelProps {
   studentRequests: StudentRequest[];
   attendance: AttendanceRecord[];
   complaints?: Complaint[];
+  outsiderDonorRequests: OutsiderBloodDonorRequest[];
+  outsiderDonors: OutsiderBloodDonor[];
+  attendanceStats?: {
+    importedStudentsCount: number;
+    duplicateRecordsFound: number;
+    duplicateRecordsRemoved: number;
+  };
+  bloodBankStats?: {
+    duplicateDonorsFound: number;
+    duplicateDonorsRemoved: number;
+  };
   noticeCategories: { id: string; name: string }[];
   onRefreshData: () => void;
   onLoginSuccess: (user: User) => void;
@@ -56,6 +70,10 @@ export default function AdminPanel({
   studentRequests = [],
   attendance = [],
   complaints = [],
+  outsiderDonorRequests = [],
+  outsiderDonors = [],
+  attendanceStats = { importedStudentsCount: 0, duplicateRecordsFound: 0, duplicateRecordsRemoved: 0 },
+  bloodBankStats = { duplicateDonorsFound: 0, duplicateDonorsRemoved: 0 },
   noticeCategories = [],
   onRefreshData,
   onLoginSuccess,
@@ -72,7 +90,38 @@ export default function AdminPanel({
   const [customCategory, setCustomCategory] = useState("");
 
   // Active Admin Submenu
-  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints">("dashboard");
+  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors">("dashboard");
+
+  // Outsider Donor States
+  const [extDonorSearchQuery, setExtDonorSearchQuery] = useState("");
+  const [extDonorStatusFilter, setExtDonorStatusFilter] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
+  const [selectedExtDonorDetail, setSelectedExtDonorDetail] = useState<OutsiderBloodDonorRequest | null>(null);
+
+  // Duplicate Management States
+  const [isImportSummaryOpen, setIsImportSummaryOpen] = useState(false);
+  const [importSummary, setImportSummary] = useState({ totalChecked: 0, added: 0, duplicates: 0, failed: 0 });
+  const [isFindDuplicatesOpen, setIsFindDuplicatesOpen] = useState(false);
+  const [detectedDuplicates, setDetectedDuplicates] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  // Donor Duplicate Management States
+  const [isDonorImportSummaryOpen, setIsDonorImportSummaryOpen] = useState(false);
+  const [donorImportSummary, setDonorImportSummary] = useState({ totalChecked: 0, added: 0, duplicates: 0, failed: 0 });
+  const [isFindDonorDuplicatesOpen, setIsFindDonorDuplicatesOpen] = useState(false);
+  const [detectedDonorDuplicates, setDetectedDonorDuplicates] = useState<any[]>([]);
+  const [isDonorImporting, setIsDonorImporting] = useState(false);
+  const [isDonorCleaning, setIsDonorCleaning] = useState(false);
+  const [importDeptFilter, setImportDeptFilter] = useState("all");
+  const [importSemFilter, setImportSemFilter] = useState("all");
+  const [selectedImportStudents, setSelectedImportStudents] = useState<string[]>([]);
+
+  // Search states for enhancements
+  const [donorSearchQuery, setDonorSearchQuery] = useState("");
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentDeptFilter, setStudentDeptFilter] = useState("all");
+  const [studentSemFilter, setStudentSemFilter] = useState("all");
+  const [facultySearchQuery, setFacultySearchQuery] = useState("");
 
   // Form states for adding items
   const [newNotice, setNewNotice] = useState({ title: "", content: "", category: "academic", departmentId: "general" });
@@ -166,28 +215,53 @@ export default function AdminPanel({
     setInfoMessage(null);
 
     const normalizedEmail = email.trim().toLowerCase();
-    if (
+    const isDefaultCredential = 
       (normalizedEmail === "sabinsaji3900@gmail.com" && password === "Sabin@123") ||
-      (normalizedEmail === "admin@gptckaduthuruthy.edu.in" && password === "campusai2026")
-    ) {
-      const mockUser = {
-        email: email.trim(),
-        uid: "sabin-fallback-uid",
-        emailVerified: true,
-      } as User;
-      setUser(mockUser);
+      (normalizedEmail === "admin@gptckaduthuruthy.edu.in" && password === "campusai2026");
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       localStorage.setItem("campusai_admin_email", email.trim());
-      onLoginSuccess(mockUser);
+      setUser(userCredential.user);
+      onLoginSuccess(userCredential.user);
       setInfoMessage(`Logged in successfully as Administrator: ${email.trim()}`);
       setEmail("");
       setPassword("");
-      return;
-    }
-
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       console.log("Failed standard signin. Code:", err.code);
+      
+      // If default credentials fail, register the admin user automatically
+      if (isDefaultCredential && (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential")) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          localStorage.setItem("campusai_admin_email", email.trim());
+          setUser(userCredential.user);
+          onLoginSuccess(userCredential.user);
+          setInfoMessage(`Admin profile successfully created in Auth and logged in: ${email.trim()}`);
+          setEmail("");
+          setPassword("");
+          return;
+        } catch (createErr: any) {
+          console.error("Auto-bootstrap creation failed:", createErr);
+        }
+      }
+
+      // Offline mock fallback if firebase auth service is unreachable/offline
+      if (isDefaultCredential) {
+        const mockUser = {
+          email: email.trim(),
+          uid: "sabin-fallback-uid",
+          emailVerified: true,
+        } as User;
+        setUser(mockUser);
+        localStorage.setItem("campusai_admin_email", email.trim());
+        onLoginSuccess(mockUser);
+        setInfoMessage(`Logged in successfully (offline fallback) as Administrator: ${email.trim()}`);
+        setEmail("");
+        setPassword("");
+        return;
+      }
+
       if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential" || err.code === "auth/operation-not-allowed") {
         setAuthError("Invalid credentials or authentication restricted. You can log in securely using 'sabinsaji3900@gmail.com' with your configured password.");
       } else {
@@ -226,10 +300,88 @@ export default function AdminPanel({
     }
   };
 
+  const getAdmissionNumberForDonor = (donor: BloodDonor): string | undefined => {
+    // First, check by ID match
+    let match = students.find(s => s.id === donor.id);
+    if (match) return match.admissionNumber;
+
+    // Second, check by Name + Department + Semester
+    match = students.find(s => 
+      s.name.toLowerCase().trim() === donor.name.toLowerCase().trim() &&
+      s.departmentId.toLowerCase().trim() === donor.departmentId.toLowerCase().trim() &&
+      s.semester === donor.semester
+    );
+    if (match) return match.admissionNumber;
+
+    // Third, check by Name only
+    match = students.find(s => s.name.toLowerCase().trim() === donor.name.toLowerCase().trim());
+    if (match) return match.admissionNumber;
+
+    return undefined;
+  };
+
+  const checkIsDonorDuplicate = (
+    studentId: string,
+    name: string,
+    dept: string,
+    sem: number,
+    admissionNum?: string
+  ): boolean => {
+    // Priority 1: Admission Number
+    if (admissionNum && admissionNum.trim()) {
+      const match = donors.some(d => {
+        if (d.id === studentId) return true;
+        const donorAdm = getAdmissionNumberForDonor(d);
+        return donorAdm && donorAdm.trim().toLowerCase() === admissionNum.trim().toLowerCase();
+      });
+      if (match) return true;
+    }
+
+    // Priority 2: Student Name + Department + Semester
+    return donors.some(d => {
+      return d.name.toLowerCase().trim() === name.toLowerCase().trim() &&
+             d.departmentId.toLowerCase().trim() === dept.toLowerCase().trim() &&
+             d.semester === sem;
+    });
+  };
+
   // General Generic Add Helper to Firestore
   const handleAddItem = async (collectionName: string, itemData: any, formResetFunc: () => void) => {
     try {
       setInfoMessage(null);
+
+      if (collectionName === "students") {
+        const admissionNumber = itemData.admissionNumber?.trim();
+        if (admissionNumber) {
+          const isDuplicate = students.some(s => s.admissionNumber?.trim() === admissionNumber);
+          if (isDuplicate) {
+            setAuthError(`Duplicate student blocked: Admission Number "${admissionNumber}" already exists in the student registry.`);
+            return;
+          }
+        }
+      }
+
+      if (collectionName === "bloodBank") {
+        const name = itemData.name;
+        const dept = itemData.departmentId;
+        const sem = itemData.semester;
+        const matchingStudent = students.find(s => 
+          s.name.toLowerCase().trim() === name.toLowerCase().trim() &&
+          s.departmentId.toLowerCase().trim() === dept.toLowerCase().trim() &&
+          s.semester === sem
+        );
+        const admissionNumber = matchingStudent?.admissionNumber;
+        if (checkIsDonorDuplicate(itemData.id || "", name, dept, sem, admissionNumber)) {
+          setAuthError(`Duplicate record blocked: Donor "${name}" already exists in the Blood Bank.`);
+          try {
+            await updateDoc(doc(db, "bloodBankStats", "summary"), {
+              duplicateDonorsFound: increment(1)
+            });
+          } catch (err) {}
+          return;
+        }
+      }
+
       // Construct a safe unique ID
       const docId = collectionName.slice(0, 2) + String(Date.now());
       const fullData = { ...itemData, id: docId };
@@ -264,7 +416,14 @@ export default function AdminPanel({
     try {
       setInfoMessage(null);
       await deleteDoc(doc(db, col, id));
-      setInfoMessage(`✅ Record deleted successfully from ${col}.`);
+      if (col === "outsiderBloodDonorRequests") {
+        try {
+          await deleteDoc(doc(db, "outsiderBloodDonors", id));
+        } catch (e) {
+          // ignore
+        }
+      }
+      setInfoMessage(`✅ Record deleted successfully.`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Delete error: ${err.message}`);
@@ -285,7 +444,80 @@ export default function AdminPanel({
     }
   };
 
+  // Outsider Donor Approval / Rejection Handlers
+  const handleApproveOutsiderRequest = async (req: OutsiderBloodDonorRequest) => {
+    try {
+      setInfoMessage(null);
+      await updateDoc(doc(db, "outsiderBloodDonorRequests", req.id), {
+        status: "Approved"
+      });
+      
+      const donorData: any = {
+        id: req.id,
+        name: req.name,
+        phone: req.phone,
+        whatsapp: req.whatsapp,
+        bloodGroup: req.bloodGroup,
+        place: req.place,
+        district: req.district,
+        createdAt: req.createdAt || new Date().toISOString()
+      };
+      if (req.age !== undefined && req.age !== null) donorData.age = Number(req.age);
+      if (req.gender) donorData.gender = req.gender;
+      
+      await setDoc(doc(db, "outsiderBloodDonors", req.id), donorData);
+      // Send email notification to admins
+      await sendEmailNotification("donor", {
+        name: req.name,
+        email: req.email || "",
+        phone: req.phone || "",
+        details: `Blood Group: ${req.bloodGroup}, Place: ${req.place}, District: ${req.district}`,
+        timestamp: new Date().toISOString(),
+      });
+      setInfoMessage(`✅ Approved request and registered ${req.name} as external blood donor.`);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError(`Approval error: ${err.message}`);
+      handleFirestoreError(err, OperationType.WRITE, "outsiderBloodDonors/" + req.id);
+    }
+  };
+
+  const handleRejectOutsiderRequest = async (req: OutsiderBloodDonorRequest) => {
+    try {
+      setInfoMessage(null);
+      await updateDoc(doc(db, "outsiderBloodDonorRequests", req.id), {
+        status: "Rejected"
+      });
+      setInfoMessage(`❌ Rejected blood donor request for ${req.name}.`);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError(`Rejection error: ${err.message}`);
+      handleFirestoreError(err, OperationType.WRITE, "outsiderBloodDonorRequests/" + req.id);
+    }
+  };
+
   // Attendance Handlers
+  const checkIsDuplicate = (
+    studentId: string,
+    name: string,
+    dept: string,
+    sem: number,
+    admissionNum?: string
+  ): boolean => {
+    if (admissionNum) {
+      const match = attendance.some(att => {
+        const s = students.find(x => x.id === att.studentId);
+        return s && s.admissionNumber?.trim() === admissionNum.trim();
+      });
+      if (match) return true;
+    }
+    return attendance.some(att => {
+      return att.studentName.toLowerCase().trim() === name.toLowerCase().trim() &&
+             att.department.toLowerCase().trim() === dept.toLowerCase().trim() &&
+             att.semester === sem;
+    });
+  };
+
   const handleAddAttendance = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -298,6 +530,17 @@ export default function AdminPanel({
         setAuthError("Selected student not found.");
         return;
       }
+
+      if (checkIsDuplicate(student.id, student.name, student.departmentId, student.semester, student.admissionNumber)) {
+        setAuthError(`Duplicate record blocked: Student "${student.name}" (ADM: ${student.admissionNumber || "N/A"}) already has an attendance record.`);
+        try {
+          await updateDoc(doc(db, "attendanceStats", "summary"), {
+            duplicateRecordsFound: increment(1)
+          });
+        } catch (err) {}
+        return;
+      }
+
       const docId = "att_" + student.id + "_" + newAttendance.month.toLowerCase().replace(/\s+/g, "_");
       const record = {
         attendanceId: docId,
@@ -345,6 +588,27 @@ export default function AdminPanel({
       for (const sId of selectedBulkStudents) {
         const student = students.find(s => s.id === sId);
         if (!student) continue;
+
+        const hasDuplicateWithOtherId = attendance.some(att => {
+          if (att.studentId === student.id) return false;
+          if (student.admissionNumber) {
+            const s = students.find(x => x.id === att.studentId);
+            if (s && s.admissionNumber?.trim() === student.admissionNumber.trim()) return true;
+          }
+          return att.studentName.toLowerCase().trim() === student.name.toLowerCase().trim() &&
+                 att.department.toLowerCase().trim() === student.departmentId.toLowerCase().trim() &&
+                 att.semester === student.semester;
+        });
+
+        if (hasDuplicateWithOtherId) {
+          try {
+            await updateDoc(doc(db, "attendanceStats", "summary"), {
+              duplicateRecordsFound: increment(1)
+            });
+          } catch (err) {}
+          continue;
+        }
+
         const docId = "att_" + student.id + "_" + bulkAttendanceMonth.toLowerCase().replace(/\s+/g, "_");
         const record = {
           attendanceId: docId,
@@ -365,6 +629,345 @@ export default function AdminPanel({
       onRefreshData();
     } catch (err: any) {
       setAuthError("Failed to bulk update attendance: " + err.message);
+    }
+  };
+
+  // Attendance Duplicate Management Functions
+  const handleImportStudentsToAttendance = async () => {
+    setIsImporting(true);
+    setInfoMessage(null);
+    let addedCount = 0;
+    let duplicateCount = 0;
+    let failedCount = 0;
+    const totalChecked = students.length;
+
+    try {
+      for (const student of students) {
+        try {
+          if (checkIsDuplicate(student.id, student.name, student.departmentId, student.semester, student.admissionNumber)) {
+            duplicateCount++;
+            continue;
+          }
+
+          const month = bulkAttendanceMonth || "June 2026";
+          const docId = "att_" + student.id + "_" + month.toLowerCase().replace(/\s+/g, "_");
+          const record = {
+            attendanceId: docId,
+            studentId: student.id,
+            studentName: student.name,
+            department: student.departmentId,
+            semester: student.semester,
+            month: month,
+            attendancePercentage: 85,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, "attendance", docId), record);
+          addedCount++;
+        } catch (err) {
+          console.error(err);
+          failedCount++;
+        }
+      }
+
+      // Update counters in database
+      await updateDoc(doc(db, "attendanceStats", "summary"), {
+        importedStudentsCount: increment(addedCount),
+        duplicateRecordsFound: increment(duplicateCount)
+      });
+
+      setImportSummary({
+        totalChecked,
+        added: addedCount,
+        duplicates: duplicateCount,
+        failed: failedCount
+      });
+      setIsImportSummaryOpen(true);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to run import process: " + err.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFindDuplicateStudents = () => {
+    const duplicatesList: any[] = [];
+    const checkedIds = new Set<string>();
+
+    for (let i = 0; i < attendance.length; i++) {
+      const att1 = attendance[i];
+      if (checkedIds.has(att1.attendanceId)) continue;
+
+      const currentStudent = students.find(s => s.id === att1.studentId);
+      const admissionNum1 = currentStudent?.admissionNumber?.trim();
+
+      const matches = attendance.filter((att2) => {
+        if (att1.attendanceId === att2.attendanceId) return false;
+        
+        const s2 = students.find(x => x.id === att2.studentId);
+        const admissionNum2 = s2?.admissionNumber?.trim();
+
+        if (admissionNum1 && admissionNum2) {
+          return admissionNum1 === admissionNum2;
+        }
+        
+        return att1.studentName.toLowerCase().trim() === att2.studentName.toLowerCase().trim() &&
+               att1.department.toLowerCase().trim() === att2.department.toLowerCase().trim() &&
+               att1.semester === att2.semester;
+      });
+
+      if (matches.length > 0) {
+        const allMatchingRecords = [att1, ...matches];
+        allMatchingRecords.forEach(r => checkedIds.add(r.attendanceId));
+        
+        duplicatesList.push({
+          name: att1.studentName,
+          admissionNumber: admissionNum1 || "N/A",
+          department: att1.department,
+          semester: att1.semester,
+          count: allMatchingRecords.length,
+          records: allMatchingRecords
+        });
+      }
+    }
+
+    setDetectedDuplicates(duplicatesList);
+    setIsFindDuplicatesOpen(true);
+  };
+
+  const handleRemoveDuplicates = async () => {
+    if (detectedDuplicates.length === 0) return;
+    if (!window.confirm(`Are you sure you want to clean up duplicates? This will keep one valid attendance record per student and delete the rest.`)) {
+      return;
+    }
+
+    setIsCleaning(true);
+    let deletedCount = 0;
+
+    try {
+      for (const duplicateGroup of detectedDuplicates) {
+        const recordsToDelete = duplicateGroup.records.slice(1);
+        for (const rec of recordsToDelete) {
+          await deleteDoc(doc(db, "attendance", rec.attendanceId));
+          deletedCount++;
+        }
+      }
+
+      await updateDoc(doc(db, "attendanceStats", "summary"), {
+        duplicateRecordsRemoved: increment(deletedCount)
+      });
+
+      setInfoMessage(`✅ Successfully cleaned up duplicate records. Removed ${deletedCount} duplicate entries.`);
+      setIsFindDuplicatesOpen(false);
+      setDetectedDuplicates([]);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to remove duplicate records: " + err.message);
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
+  // Blood Bank Duplicate & Import Management Functions
+  const filteredImportStudents = React.useMemo(() => {
+    return students.filter(s => {
+      const matchDept = importDeptFilter === "all" || s.departmentId.toLowerCase() === importDeptFilter.toLowerCase();
+      const matchSem = importSemFilter === "all" || s.semester === Number(importSemFilter);
+      return matchDept && matchSem;
+    });
+  }, [students, importDeptFilter, importSemFilter]);
+
+  const filteredDonorsList = React.useMemo(() => {
+    return donors.filter(d => {
+      const q = donorSearchQuery.toLowerCase().trim();
+      if (!q) return true;
+      const admissionNum = getAdmissionNumberForDonor(d)?.toLowerCase() || "";
+      return d.name.toLowerCase().includes(q) ||
+             admissionNum.includes(q) ||
+             d.bloodGroup.toLowerCase().includes(q) ||
+             d.departmentId.toLowerCase().includes(q) ||
+             String(d.semester).includes(q) ||
+             d.place.toLowerCase().includes(q);
+    });
+  }, [donors, donorSearchQuery, students]);
+
+  const filteredStudents = React.useMemo(() => {
+    return students.filter(s => {
+      const q = studentSearchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+                            s.name.toLowerCase().includes(q) ||
+                            (s.admissionNumber && s.admissionNumber.toLowerCase().includes(q)) ||
+                            s.departmentId.toLowerCase().includes(q) ||
+                            String(s.semester).includes(q) ||
+                            (s.place && s.place.toLowerCase().includes(q));
+
+      const matchesDept = studentDeptFilter === "all" || s.departmentId.toLowerCase() === studentDeptFilter.toLowerCase();
+      const matchesSem = studentSemFilter === "all" || String(s.semester) === studentSemFilter;
+
+      return matchesSearch && matchesDept && matchesSem;
+    });
+  }, [students, studentSearchQuery, studentDeptFilter, studentSemFilter]);
+
+  const filteredTeachers = React.useMemo(() => {
+    return teachers.filter(t => {
+      const q = facultySearchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return t.name.toLowerCase().includes(q) ||
+             t.departmentId.toLowerCase().includes(q) ||
+             t.designation.toLowerCase().includes(q) ||
+             t.email.toLowerCase().includes(q);
+    });
+  }, [teachers, facultySearchQuery]);
+
+  const handleSelectAllImportStudents = (checked: boolean) => {
+    if (checked) {
+      setSelectedImportStudents(filteredImportStudents.map(s => s.id));
+    } else {
+      setSelectedImportStudents([]);
+    }
+  };
+
+  const handleImportStudentsToBloodBank = async () => {
+    if (selectedImportStudents.length === 0) {
+      setAuthError("Please select at least one student to import.");
+      return;
+    }
+
+    setIsDonorImporting(true);
+    setInfoMessage(null);
+    let addedCount = 0;
+    let duplicateCount = 0;
+    let failedCount = 0;
+    const totalChecked = selectedImportStudents.length;
+
+    try {
+      for (const sId of selectedImportStudents) {
+        const student = students.find(s => s.id === sId);
+        if (!student) {
+          failedCount++;
+          continue;
+        }
+
+        try {
+          if (checkIsDonorDuplicate(student.id, student.name, student.departmentId, student.semester, student.admissionNumber)) {
+            duplicateCount++;
+            continue;
+          }
+
+          const docId = student.id;
+          const donorData = {
+            id: docId,
+            name: student.name,
+            bloodGroup: student.bloodGroup || "O+",
+            departmentId: student.departmentId,
+            semester: student.semester,
+            place: student.place || "Campus",
+            phone: student.phone || "",
+            isAvailable: true
+          };
+
+          await setDoc(doc(db, "bloodBank", docId), donorData);
+          addedCount++;
+        } catch (err) {
+          console.error("Error importing student donor:", err);
+          failedCount++;
+        }
+      }
+
+      await updateDoc(doc(db, "bloodBankStats", "summary"), {
+        duplicateDonorsFound: increment(duplicateCount)
+      });
+
+      setDonorImportSummary({
+        totalChecked,
+        added: addedCount,
+        duplicates: duplicateCount,
+        failed: failedCount
+      });
+      setIsDonorImportSummaryOpen(true);
+      setSelectedImportStudents([]);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to import students to Blood Bank: " + err.message);
+    } finally {
+      setIsDonorImporting(false);
+    }
+  };
+
+  const handleFindDuplicateDonors = () => {
+    const duplicatesList: any[] = [];
+    const checkedIds = new Set<string>();
+
+    for (let i = 0; i < donors.length; i++) {
+      const d1 = donors[i];
+      if (checkedIds.has(d1.id)) continue;
+
+      const admissionNum1 = getAdmissionNumberForDonor(d1)?.trim();
+
+      const matches = donors.filter((d2) => {
+        if (d1.id === d2.id) return false;
+
+        const admissionNum2 = getAdmissionNumberForDonor(d2)?.trim();
+
+        if (admissionNum1 && admissionNum2) {
+          return admissionNum1.toLowerCase() === admissionNum2.toLowerCase();
+        }
+
+        return d1.name.toLowerCase().trim() === d2.name.toLowerCase().trim() &&
+               d1.departmentId.toLowerCase().trim() === d2.departmentId.toLowerCase().trim() &&
+               d1.semester === d2.semester;
+      });
+
+      if (matches.length > 0) {
+        const allMatchingDonors = [d1, ...matches];
+        allMatchingDonors.forEach(d => checkedIds.add(d.id));
+
+        duplicatesList.push({
+          name: d1.name,
+          admissionNumber: admissionNum1 || "N/A",
+          department: d1.departmentId,
+          semester: d1.semester,
+          count: allMatchingDonors.length,
+          records: allMatchingDonors
+        });
+      }
+    }
+
+    setDetectedDonorDuplicates(duplicatesList);
+    setIsFindDonorDuplicatesOpen(true);
+  };
+
+  const handleRemoveDuplicateDonors = async () => {
+    if (detectedDonorDuplicates.length === 0) return;
+    if (!window.confirm(`Are you sure you want to clean up duplicate student donors? This will keep one valid record per student and delete the rest.`)) {
+      return;
+    }
+
+    setIsDonorCleaning(true);
+    let deletedCount = 0;
+
+    try {
+      for (const duplicateGroup of detectedDonorDuplicates) {
+        const recordsToDelete = duplicateGroup.records.slice(1);
+        for (const rec of recordsToDelete) {
+          await deleteDoc(doc(db, "bloodBank", rec.id));
+          deletedCount++;
+        }
+      }
+
+      await updateDoc(doc(db, "bloodBankStats", "summary"), {
+        duplicateDonorsRemoved: increment(deletedCount)
+      });
+
+      setInfoMessage(`✅ Successfully cleaned up duplicate donor records. Removed ${deletedCount} duplicate entries.`);
+      setIsFindDonorDuplicatesOpen(false);
+      setDetectedDonorDuplicates([]);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to remove duplicate donor records: " + err.message);
+    } finally {
+      setIsDonorCleaning(false);
     }
   };
 
@@ -407,6 +1010,7 @@ export default function AdminPanel({
   const pendingComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Pending").length, [complaints]);
   const underReviewComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Under Review").length, [complaints]);
   const resolvedComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Resolved").length, [complaints]);
+  const anonymousComplaintsCount = React.useMemo(() => complaints.filter(c => c.isAnonymous).length, [complaints]);
 
   const handleUpdateComplaintStatus = async (complaintId: string, nextStatus: "Pending" | "Under Review" | "Resolved" | "Rejected") => {
     try {
@@ -601,6 +1205,7 @@ export default function AdminPanel({
             { id: "qpapers", label: "Question Papers", icon: FileText },
             { id: "bloodbank", label: "Blood Donors", icon: Droplet },
             { id: "requests", label: "Student Requests", icon: ClipboardCheck },
+            { id: "outsiderDonors", label: "Outsider Donors", icon: Heart },
             { id: "complaints", label: "Complaints", icon: MessageSquare },
           ].map((sub) => {
             const Icon = sub.icon;
@@ -695,12 +1300,13 @@ export default function AdminPanel({
 
             {/* Complaints Analytics Dashboard Row */}
             <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 font-sans text-xs">
               {[
                 { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
-                { label: "Pending Issues", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
-                { label: "Under Review", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
-                { label: "Resolved Cases", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle }
+                { label: "Pending Complaints", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
+                { label: "Under Review Complaints", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
+                { label: "Resolved Complaints", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle },
+                { label: "Anonymous Complaints", count: anonymousComplaintsCount, color: "from-slate-600 to-slate-500", icon: Lock }
               ].map((card, i) => {
                 const Icon = card.icon;
                 return (
@@ -710,6 +1316,50 @@ export default function AdminPanel({
                         {card.badge}
                       </span>
                     )}
+                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Attendance Duplicate & Import Analytics Row */}
+            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Attendance Duplicate & Import Metrics</h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+              {[
+                { label: "Total Attendance Students", count: new Set(attendance.map(a => a.studentId)).size, color: "from-sky-600 to-sky-500", icon: Users },
+                { label: "Imported Students", count: attendanceStats.importedStudentsCount, color: "from-blue-600 to-indigo-500", icon: ClipboardCheck },
+                { label: "Duplicate Records Found", count: attendanceStats.duplicateRecordsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                { label: "Duplicate Records Removed", count: attendanceStats.duplicateRecordsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+              ].map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Blood Bank Duplicate & Import Analytics Row */}
+            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Blood Bank Duplicate & Import Metrics</h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+              {[
+                { label: "Total Student Donors", count: donors.length, color: "from-red-600 to-rose-500", icon: Droplet },
+                { label: "Total External Donors", count: outsiderDonors.length, color: "from-pink-600 to-rose-500", icon: Heart },
+                { label: "Duplicate Donors Found", count: bloodBankStats.duplicateDonorsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                { label: "Duplicate Donors Removed", count: bloodBankStats.duplicateDonorsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+              ].map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
                     <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
                       <Icon className="h-5 w-5" />
                     </div>
@@ -957,25 +1607,42 @@ export default function AdminPanel({
             </form>
 
             <div className="border-t border-slate-100 pt-6">
-              <h4 className="text-sm font-bold text-slate-800 mb-4">Active Faculty ({teachers.length})</h4>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h4 className="text-sm font-bold text-slate-800 font-sans">Active Faculty ({filteredTeachers.length})</h4>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search faculty..."
+                    value={facultySearchQuery}
+                    onChange={(e) => setFacultySearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 outline-none w-full focus:bg-white transition-all font-sans"
+                  />
+                </div>
+              </div>
+
               <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-                {teachers.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <img src={t.photo || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"} alt={t.name} className="h-10 w-10 rounded-full object-cover border border-slate-200 shrink-0" referrerPolicy="no-referrer" />
-                      <div>
-                        <p className="text-xs font-bold text-slate-700">{t.name}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{t.designation} • <span className="uppercase text-blue-600 font-bold">{t.departmentId}</span> • {t.email} • {t.phone}</p>
+                {filteredTeachers.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400 font-bold font-sans">No matching records found.</div>
+                ) : (
+                  filteredTeachers.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <img src={t.photo || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80"} alt={t.name} className="h-10 w-10 rounded-full object-cover border border-slate-200 shrink-0" referrerPolicy="no-referrer" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">{t.name}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{t.designation} • <span className="uppercase text-blue-600 font-bold">{t.departmentId}</span> • {t.email} • {t.phone}</p>
+                        </div>
                       </div>
+                      <button
+                        onClick={() => handleDeleteItem("faculty", t.id, t.name)}
+                        className="p-1 px-2 text-red-650 hover:bg-red-50 border border-red-50 rounded-lg"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteItem("faculty", t.id, t.name)}
-                      className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1125,22 +1792,59 @@ export default function AdminPanel({
             </form>
 
             <div className="border-t border-slate-100 pt-6">
-              <h4 className="text-sm font-bold text-slate-800 mb-4 font-sans">Registered Students ({students.length})</h4>
-              <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-                {students.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">{s.name} <span className="text-[10px] text-slate-400">({s.admissionNumber})</span></p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">Sem {s.semester} • <strong className="uppercase">{s.departmentId}</strong> • Blood: <strong className="text-red-500">{s.bloodGroup}</strong> • Place: {s.place} • Tel: {s.phone} • Parent: {s.parentName} ({s.parentPhone})</p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteItem("students", s.id, s.name)}
-                      className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h4 className="text-sm font-bold text-slate-800 font-sans">Registered Students ({filteredStudents.length})</h4>
+                <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+                  <div className="relative flex-1 sm:flex-none">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search students..."
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 outline-none w-full sm:w-44 focus:bg-white focus:w-56 transition-all font-sans"
+                    />
                   </div>
-                ))}
+
+                  <select
+                    value={studentDeptFilter}
+                    onChange={(e) => setStudentDeptFilter(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold bg-white outline-none cursor-pointer font-sans"
+                  >
+                    <option value="all">All Depts</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.code.toUpperCase()}</option>)}
+                  </select>
+
+                  <select
+                    value={studentSemFilter}
+                    onChange={(e) => setStudentSemFilter(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold bg-white outline-none cursor-pointer font-sans"
+                  >
+                    <option value="all">All Sems</option>
+                    {[1, 2, 3, 4, 5, 6].map(s => <option key={s} value={s.toString()}>S{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+                {filteredStudents.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400 font-bold font-sans">No matching records found.</div>
+                ) : (
+                  filteredStudents.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">{s.name} <span className="text-[10px] text-slate-400">({s.admissionNumber})</span></p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">Sem {s.semester} • <strong className="uppercase">{s.departmentId}</strong> • Blood: <strong className="text-red-500">{s.bloodGroup}</strong> • Place: {s.place} • Tel: {s.phone} • Parent: {s.parentName} ({s.parentPhone})</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteItem("students", s.id, s.name)}
+                        className="p-1 px-2 text-red-650 hover:bg-red-50 border border-red-50 rounded-lg"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1532,124 +2236,279 @@ export default function AdminPanel({
 
         {/* 8. Blood Bank Sub-Tab */}
         {activeSubTab === "bloodbank" && (
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
-            <h3 className="text-md font-bold text-slate-800 border-b border-slate-100 pb-3 font-sans">Add Emergency Blood Donor</h3>
-            
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleAddItem("bloodBank", newDonor, () => setNewDonor({ name: "", bloodGroup: "O+", departmentId: "computer", semester: 5, place: "", phone: "", isAvailable: true }));
-             }} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-xs font-bold text-slate-500">Student Donor Name</label>
-                <input
-                  type="text"
-                  value={newDonor.name}
-                  onChange={(e) => setNewDonor({...newDonor, name: e.target.value})}
-                  required
-                  placeholder="e.g. Midhun Mohan"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 outline-none"
-                />
+          <div className="space-y-6">
+            {/* Bulk Student Donor Import Tool */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                <div>
+                  <h3 className="text-md font-bold text-slate-800 font-sans">Bulk Student Donor Import</h3>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Filter the student registry and import students to the Blood Bank with duplicate protection.</p>
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-500">Blood Group</label>
-                <select
-                  value={newDonor.bloodGroup}
-                  onChange={(e) => setNewDonor({...newDonor, bloodGroup: e.target.value})}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Filter Department</label>
+                  <select
+                    value={importDeptFilter}
+                    onChange={(e) => {
+                      setImportDeptFilter(e.target.value);
+                      setSelectedImportStudents([]);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+                  >
+                    <option value="all">All Departments</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Filter Semester</label>
+                  <select
+                    value={importSemFilter}
+                    onChange={(e) => {
+                      setImportSemFilter(e.target.value);
+                      setSelectedImportStudents([]);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+                  >
+                    <option value="all">All Semesters</option>
+                    {[1, 2, 3, 4, 5, 6].map(s => <option key={s} value={String(s)}>Semester {s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 flex justify-between items-center">
+                  <span>Select Students ({selectedImportStudents.length} of {filteredImportStudents.length} selected)</span>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const allSelected = filteredImportStudents.every(s => selectedImportStudents.includes(s.id));
+                      handleSelectAllImportStudents(!allSelected);
+                    }}
+                    className="text-blue-600 hover:underline text-[10px] uppercase font-bold"
+                  >
+                    {filteredImportStudents.length > 0 && filteredImportStudents.every(s => selectedImportStudents.includes(s.id)) ? "Deselect All" : "Select All"}
+                  </button>
+                </label>
+                
+                <div className="border border-slate-100 rounded-2xl max-h-48 overflow-y-auto p-3 bg-slate-50/50 space-y-2">
+                  {filteredImportStudents.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-400 font-bold">No students found matching current filters.</div>
+                  ) : (
+                    filteredImportStudents.map(s => {
+                      const deptCode = departments.find(d => d.id === s.departmentId)?.code || s.departmentId;
+                      const isAlreadyDonor = donors.some(d => d.id === s.id);
+                      return (
+                        <label key={s.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={selectedImportStudents.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedImportStudents([...selectedImportStudents, s.id]);
+                              } else {
+                                setSelectedImportStudents(selectedImportStudents.filter(id => id !== s.id));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
+                          />
+                          <div className="flex flex-1 items-center justify-between">
+                            <span>{s.name} (S{s.semester} · {deptCode.toUpperCase()}) {s.admissionNumber ? `[ADM: ${s.admissionNumber}]` : ""}</span>
+                            {isAlreadyDonor && (
+                              <span className="bg-red-50 text-red-650 border border-red-100 text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0">Already registered</span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleImportStudentsToBloodBank}
+                  disabled={isDonorImporting || selectedImportStudents.length === 0}
+                  className="rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 disabled:bg-slate-50 disabled:border-slate-100 disabled:text-slate-400 text-blue-600 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans shadow-sm"
                 >
-                  {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(bg => <option key={bg} value={bg}>{bg}</option>)}
-                </select>
-              </div>
+                  <Plus className="h-4 w-4" />
+                  {isDonorImporting ? "Importing..." : "Import Students to Blood Bank"}
+                </button>
 
-              <div>
-                <label className="text-xs font-bold text-slate-500">Department</label>
-                <select
-                  value={newDonor.departmentId}
-                  onChange={(e) => setNewDonor({...newDonor, departmentId: e.target.value})}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+                <button
+                  type="button"
+                  onClick={handleFindDuplicateDonors}
+                  className="rounded-xl border border-amber-100 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans shadow-sm"
                 >
-                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
+                  <Search className="h-4 w-4" />
+                  Find Duplicate Donors
+                </button>
 
-              <div>
-                <label className="text-xs font-bold text-slate-500">Syllabus Semester</label>
-                <select
-                  value={newDonor.semester}
-                  onChange={(e) => setNewDonor({...newDonor, semester: parseInt(e.target.value) || 1})}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+                <button
+                  type="button"
+                  onClick={handleRemoveDuplicateDonors}
+                  disabled={isDonorCleaning}
+                  className="rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 disabled:bg-slate-50 disabled:border-slate-100 disabled:text-slate-400 text-red-600 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans shadow-sm"
                 >
-                  {[1,2,3,4,5,6].map(s => <option key={s} value={s}>Semester {s}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500">Home Place / Location</label>
-                <input
-                  type="text"
-                  value={newDonor.place}
-                  onChange={(e) => setNewDonor({...newDonor, place: e.target.value})}
-                  required
-                  placeholder="e.g. Kaduthuruthy"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500">Emergency Phone Number</label>
-                <input
-                  type="text"
-                  value={newDonor.phone}
-                  onChange={(e) => setNewDonor({...newDonor, phone: e.target.value})}
-                  required
-                  placeholder="e.g. +91 9447112233"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 outline-none"
-                />
-              </div>
-
-              <button type="submit" className="sm:col-span-2 flex h-11 items-center justify-center gap-1.5 rounded-xl bg-blue-600 font-bold text-xs text-white hover:bg-blue-700">
-                <Plus className="h-4.5 w-4.5" />
-                <span>Save Donor Profile</span>
-              </button>
-            </form>
-
-            <div className="border-t border-slate-100 pt-6">
-              <h4 className="text-sm font-bold text-slate-800 mb-4 font-sans">Emergency Blood Donor Lists ({donors.length})</h4>
-              <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-                {donors.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">{b.name} <span className="text-[10px] text-slate-400 capitalize">({b.place})</span></p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        Group: <strong className="text-red-600">{b.bloodGroup}</strong> • Tel: {b.phone} • Status: 
-                        <span className={`ml-1 font-bold ${b.isAvailable ? "text-green-600" : "text-slate-400"}`}>
-                          {b.isAvailable ? "Active/Available" : "Unavailable"}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleDonor(b)}
-                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
-                          b.isAvailable 
-                            ? "bg-green-50 border-green-200 text-green-700" 
-                            : "bg-slate-50 border-slate-200 text-slate-500"
-                        }`}
-                      >
-                        Toggle Status
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem("bloodBank", b.id, b.name)}
-                        className="p-1 px-2 text-red-600 hover:bg-red-50 border border-red-50 rounded-lg shrink-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  <Trash2 className="h-4 w-4" />
+                  {isDonorCleaning ? "Cleaning..." : "Remove Duplicates"}
+                </button>
               </div>
             </div>
+
+            {/* Emergency Blood Donor List */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <h4 className="text-sm font-bold text-slate-800 font-sans">Emergency Blood Donors ({filteredDonorsList.length})</h4>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search donors..."
+                    value={donorSearchQuery}
+                    onChange={(e) => setDonorSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 outline-none w-full focus:bg-white transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto pr-1">
+                {filteredDonorsList.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 text-xs font-bold font-sans">
+                    {donorSearchQuery.trim() ? "No matching records found." : "No registered donors in the Blood Bank. Use the import tool above to register student donors."}
+                  </div>
+                ) : (
+                  filteredDonorsList.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">{b.name} <span className="text-[10px] text-slate-400 capitalize">({b.place})</span></p>
+                        <p className="text-[10px] text-slate-450 mt-0.5">
+                          Group: <strong className="text-red-650 font-extrabold">{b.bloodGroup}</strong> • Semester {b.semester} • Department: <span className="uppercase font-bold">{b.departmentId}</span> • Tel: {b.phone} • Status: 
+                          <span className={`ml-1 font-black ${b.isAvailable ? "text-green-600" : "text-slate-405"}`}>
+                            {b.isAvailable ? "Active/Available" : "Unavailable"}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleToggleDonor(b)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition ${
+                            b.isAvailable 
+                              ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100" 
+                              : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                          }`}
+                        >
+                          Toggle Status
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem("bloodBank", b.id, b.name)}
+                          className="p-1.5 px-2.5 text-red-650 hover:bg-red-50 border border-red-100 rounded-lg shrink-0 transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Modals for donor summary and duplicate lists */}
+            {isDonorImportSummaryOpen && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setIsDonorImportSummaryOpen(false)} />
+                
+                <div className="relative max-w-md w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-xl z-10 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h4 className="text-sm font-bold text-slate-805 font-sans">Donor Import Completed</h4>
+                    <button onClick={() => setIsDonorImportSummaryOpen(false)} className="text-slate-400 hover:text-slate-655">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs font-semibold text-slate-655 font-sans">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <p className="flex justify-between"><span>Total Students Selected:</span> <span className="font-bold text-slate-805">{donorImportSummary.totalChecked}</span></p>
+                      <p className="flex justify-between text-emerald-650"><span>Successfully Added as Donors:</span> <span className="font-bold">{donorImportSummary.added}</span></p>
+                      <p className="flex justify-between text-amber-600"><span>Duplicates Skipped:</span> <span className="font-bold">{donorImportSummary.duplicates}</span></p>
+                      <p className="flex justify-between text-rose-650"><span>Failed Records:</span> <span className="font-bold">{donorImportSummary.failed}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsDonorImportSummaryOpen(false)}
+                      className="rounded-xl bg-slate-900 hover:bg-slate-855 text-white px-5 py-2 text-xs font-bold transition uppercase cursor-pointer font-sans"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isFindDonorDuplicatesOpen && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setIsFindDonorDuplicatesOpen(false)} />
+                
+                <div className="relative max-w-2xl w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-xl z-10 space-y-4 max-h-[85vh] flex flex-col">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-805 font-sans">Duplicate Student Donor Detection</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 font-sans">Found {detectedDonorDuplicates.length} student registry duplicates inside Blood Bank registry.</p>
+                    </div>
+                    <button onClick={() => setIsFindDonorDuplicatesOpen(false)} className="text-slate-400 hover:text-slate-655">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto flex-1 pr-1 space-y-2 min-h-[150px] font-sans">
+                    {detectedDonorDuplicates.length === 0 ? (
+                      <p className="text-xs font-bold text-slate-450 text-center py-6">No duplicate donor records detected in the blood bank database.</p>
+                    ) : (
+                      detectedDonorDuplicates.map((dup, i) => (
+                        <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-slate-805">{dup.name}</div>
+                            <div className="text-[10px] text-slate-450 font-bold uppercase mt-0.5 tracking-wider">
+                              ADM: {dup.admissionNumber} · Semester {dup.semester} · Department: {dup.department.toUpperCase()}
+                            </div>
+                          </div>
+                          <span className="bg-amber-50 border border-amber-100 text-amber-705 font-black px-2.5 py-1 rounded-lg text-[10px] uppercase">
+                            {dup.count} Records
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-100 shrink-0 text-xs font-bold font-sans">
+                    <button
+                      type="button"
+                      onClick={() => setIsFindDonorDuplicatesOpen(false)}
+                      className="rounded-xl px-4 py-2 border border-slate-200 text-slate-650 hover:bg-slate-50 transition uppercase cursor-pointer"
+                    >
+                      Close
+                    </button>
+                    {detectedDonorDuplicates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveDuplicateDonors}
+                        disabled={isDonorCleaning}
+                        className="rounded-xl bg-rose-650 hover:bg-rose-700 disabled:bg-rose-400 text-white px-5 py-2 transition uppercase flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {isDonorCleaning ? "Removing..." : "Remove Duplicates"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2194,6 +3053,182 @@ export default function AdminPanel({
               </div>
             </div>
 
+            {/* Import & Duplicate Management Tool */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-4">
+              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 font-sans">Duplicate Prevention & Bulk Import Tools</h3>
+              <p className="text-xs text-slate-400 font-semibold leading-relaxed font-sans">
+                Scan your student database to import records with duplicate protection or detect and remove existing duplicate records from the attendance registry.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <button
+                  type="button"
+                  onClick={handleImportStudentsToAttendance}
+                  disabled={isImporting}
+                  className="rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 disabled:bg-blue-50 text-blue-600 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans"
+                >
+                  <Plus className="h-4 w-4" />
+                  {isImporting ? "Importing..." : "Import Students to Attendance"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFindDuplicateStudents}
+                  className="rounded-xl border border-amber-100 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans"
+                >
+                  <Search className="h-4 w-4" />
+                  Find Duplicate Students
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const duplicatesList: any[] = [];
+                    const checkedIds = new Set<string>();
+
+                    for (let i = 0; i < attendance.length; i++) {
+                      const att1 = attendance[i];
+                      if (checkedIds.has(att1.attendanceId)) continue;
+                      const currentStudent = students.find(s => s.id === att1.studentId);
+                      const admissionNum1 = currentStudent?.admissionNumber?.trim();
+
+                      const matches = attendance.filter((att2) => {
+                        if (att1.attendanceId === att2.attendanceId) return false;
+                        const s2 = students.find(x => x.id === att2.studentId);
+                        const admissionNum2 = s2?.admissionNumber?.trim();
+                        if (admissionNum1 && admissionNum2) {
+                          return admissionNum1 === admissionNum2;
+                        }
+                        return att1.studentName.toLowerCase().trim() === att2.studentName.toLowerCase().trim() &&
+                               att1.department.toLowerCase().trim() === att2.department.toLowerCase().trim() &&
+                               att1.semester === att2.semester;
+                      });
+
+                      if (matches.length > 0) {
+                        const allMatchingRecords = [att1, ...matches];
+                        allMatchingRecords.forEach(r => checkedIds.add(r.attendanceId));
+                        duplicatesList.push({
+                          name: att1.studentName,
+                          admissionNumber: admissionNum1 || "N/A",
+                          department: att1.department,
+                          semester: att1.semester,
+                          count: allMatchingRecords.length,
+                          records: allMatchingRecords
+                        });
+                      }
+                    }
+
+                    if (duplicatesList.length === 0) {
+                      alert("No duplicate student records detected in the attendance database.");
+                      return;
+                    }
+
+                    setDetectedDuplicates(duplicatesList);
+                    setIsFindDuplicatesOpen(true);
+                  }}
+                  disabled={isCleaning}
+                  className="rounded-xl border border-rose-100 bg-rose-50 hover:bg-rose-100 disabled:bg-rose-50 text-rose-600 text-xs font-bold py-3 transition active:scale-95 uppercase tracking-wide flex items-center justify-center gap-1.5 cursor-pointer font-sans"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {isCleaning ? "Cleaning..." : "Remove Duplicates"}
+                </button>
+              </div>
+            </div>
+
+            {/* Modals for summary and duplicate lists */}
+            {isImportSummaryOpen && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setIsImportSummaryOpen(false)} />
+                
+                <div className="relative max-w-md w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-xl z-10 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h4 className="text-sm font-bold text-slate-800 font-sans">Import Completed</h4>
+                    <button onClick={() => setIsImportSummaryOpen(false)} className="text-slate-400 hover:text-slate-655">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs font-semibold text-slate-600 font-sans font-sans">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <p className="flex justify-between"><span>Total Students Checked:</span> <span className="font-bold text-slate-805">{importSummary.totalChecked}</span></p>
+                      <p className="flex justify-between text-emerald-650"><span>Successfully Added:</span> <span className="font-bold">{importSummary.added}</span></p>
+                      <p className="flex justify-between text-amber-600"><span>Duplicates Skipped:</span> <span className="font-bold">{importSummary.duplicates}</span></p>
+                      <p className="flex justify-between text-rose-650"><span>Failed Records:</span> <span className="font-bold">{importSummary.failed}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsImportSummaryOpen(false)}
+                      className="rounded-xl bg-slate-900 hover:bg-slate-855 text-white px-5 py-2 text-xs font-bold transition uppercase cursor-pointer font-sans"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isFindDuplicatesOpen && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setIsFindDuplicatesOpen(false)} />
+                
+                <div className="relative max-w-2xl w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-xl z-10 space-y-4 max-h-[85vh] flex flex-col">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-805 font-sans">Duplicate Student Detection</h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 font-sans">Found {detectedDuplicates.length} student registry duplicates inside attendance logs.</p>
+                    </div>
+                    <button onClick={() => setIsFindDuplicatesOpen(false)} className="text-slate-400 hover:text-slate-655">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto flex-1 pr-1 space-y-2 min-h-[150px] font-sans">
+                    {detectedDuplicates.length === 0 ? (
+                      <p className="text-xs font-bold text-slate-450 text-center py-6">No duplicate student records detected in the attendance database.</p>
+                    ) : (
+                      detectedDuplicates.map((dup, i) => (
+                        <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-slate-805">{dup.name}</div>
+                            <div className="text-[10px] text-slate-450 font-bold uppercase mt-0.5 tracking-wider">
+                              ADM: {dup.admissionNumber} · S{dup.semester} · {dup.department.toUpperCase()}
+                            </div>
+                          </div>
+                          <span className="bg-amber-50 border border-amber-100 text-amber-705 font-black px-2.5 py-1 rounded-lg text-[10px] uppercase">
+                            {dup.count} Records
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-100 shrink-0 text-xs font-bold font-sans">
+                    <button
+                      type="button"
+                      onClick={() => setIsFindDuplicatesOpen(false)}
+                      className="rounded-xl px-4 py-2 border border-slate-200 text-slate-650 hover:bg-slate-50 transition uppercase cursor-pointer"
+                    >
+                      Close
+                    </button>
+                    {detectedDuplicates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveDuplicates}
+                        disabled={isCleaning}
+                        className="rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white px-5 py-2 transition uppercase flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {isCleaning ? "Removing..." : "Remove Duplicates"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Reports and Database view */}
             <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
@@ -2239,8 +3274,21 @@ export default function AdminPanel({
                 {(() => {
                   const filtered = attendance.filter(rec => {
                     const q = attendanceSearchQuery.toLowerCase().trim();
-                    const matchesSearch = rec.studentName.toLowerCase().includes(q) || 
-                                          (rec.studentId && rec.studentId.toLowerCase().includes(q));
+                    const studentObj = students.find(s => s.id === rec.studentId);
+                    const admissionNum = studentObj?.admissionNumber?.toLowerCase() || "";
+                    const deptObj = departments.find(d => d.id === rec.department);
+                    const deptName = deptObj?.name?.toLowerCase() || "";
+                    const deptCode = deptObj?.code?.toLowerCase() || "";
+
+                    const matchesSearch = !q ||
+                                          rec.studentName.toLowerCase().includes(q) ||
+                                          admissionNum.includes(q) ||
+                                          rec.department.toLowerCase().includes(q) ||
+                                          deptName.includes(q) ||
+                                          deptCode.includes(q) ||
+                                          String(rec.semester).includes(q) ||
+                                          String(rec.attendancePercentage).includes(q);
+
                     const matchesDept = attendanceDeptFilter === "all" || rec.department === attendanceDeptFilter;
                     const matchesSem = attendanceSemFilter === "all" || rec.semester.toString() === attendanceSemFilter;
                     return matchesSearch && matchesDept && matchesSem;
@@ -2248,7 +3296,7 @@ export default function AdminPanel({
 
                   if (filtered.length === 0) {
                     return (
-                      <p className="text-xs text-center text-slate-400 font-semibold py-8">No matching attendance records found.</p>
+                      <p className="text-xs text-center text-slate-400 font-bold py-8 font-sans">No matching records found.</p>
                     );
                   }
 
@@ -2700,12 +3748,12 @@ export default function AdminPanel({
                             {selectedComplaintDetail.isAnonymous ? (
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase w-fit">
-                                  <span>🔒 Anonymous Submission</span>
+                                  <span>🔒 Anonymous Submission (Identity Visible to Admin)</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 pt-1 font-semibold text-slate-650">
-                                  <p>Name: <span className="text-slate-400 italic">Anonymous User</span></p>
-                                  <p>Phone: <span className="text-slate-400 italic">Hidden</span></p>
-                                  <p className="col-span-2">Email: <span className="text-slate-400 italic">Hidden</span></p>
+                                  <p>Name: <span className="font-bold text-slate-900">{selectedComplaintDetail.name}</span></p>
+                                  <p>Phone: <span className="font-bold text-slate-800">{selectedComplaintDetail.phoneNumber}</span></p>
+                                  <p className="col-span-2">Email: <span className="font-semibold text-slate-800 underline">{selectedComplaintDetail.email || "N/A"}</span></p>
                                 </div>
                               </div>
                             ) : (
@@ -2799,6 +3847,165 @@ export default function AdminPanel({
                     </div>
                   )}
 
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 12. Outsider Donors Management Sub-Tab */}
+        {activeSubTab === "outsiderDonors" && (
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6 animate-fade-in font-sans text-xs">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4 gap-2">
+              <div>
+                <h3 className="text-md font-bold text-slate-800 font-sans text-sm">External Blood Donor Registry</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">Manage and review registration requests from external blood donors (non-students).</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="bg-emerald-50 border border-emerald-100 text-emerald-750 font-extrabold text-[10px] tracking-wider uppercase px-3 py-1 rounded-full shrink-0">
+                  Approved: {outsiderDonors.length}
+                </span>
+                <span className="bg-blue-50 border border-blue-100 text-blue-750 font-extrabold text-[10px] tracking-wider uppercase px-3 py-1 rounded-full shrink-0">
+                  Requests: {outsiderDonorRequests.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Filters Section */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, place, district or phone..."
+                  value={extDonorSearchQuery}
+                  onChange={(e) => setExtDonorSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 transition"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer">
+                <Filter className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Status:</span>
+                <select
+                  value={extDonorStatusFilter}
+                  onChange={(e) => setExtDonorStatusFilter(e.target.value as any)}
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="All">All Requests</option>
+                  <option value="Pending">Pending Only</option>
+                  <option value="Approved">Approved Only</option>
+                  <option value="Rejected">Rejected Only</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Content List / Table */}
+            {(() => {
+              const filtered = outsiderDonorRequests.filter((req) => {
+                const matchesSearch = 
+                  req.name.toLowerCase().includes(extDonorSearchQuery.toLowerCase()) ||
+                  req.place.toLowerCase().includes(extDonorSearchQuery.toLowerCase()) ||
+                  req.district.toLowerCase().includes(extDonorSearchQuery.toLowerCase()) ||
+                  req.phone.includes(extDonorSearchQuery) ||
+                  req.bloodGroup.toLowerCase().includes(extDonorSearchQuery.toLowerCase());
+                
+                const matchesStatus = extDonorStatusFilter === "All" || req.status === extDonorStatusFilter;
+                return matchesSearch && matchesStatus;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 p-10 text-center space-y-2">
+                    <p className="text-sm font-extrabold text-slate-750">No matching records found.</p>
+                    <p className="text-xs text-slate-400 font-semibold font-sans">Try expanding your search query or changing filters.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                        <th className="p-4">Name & Contact</th>
+                        <th className="p-4">Blood Group</th>
+                        <th className="p-4">Location</th>
+                        <th className="p-4">Demographics</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 text-xs font-semibold text-slate-650">
+                      {filtered.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50/50 transition">
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{req.name}</div>
+                            <div className="text-[10px] text-slate-450 mt-0.5 space-y-0.5">
+                              <div>📞 {req.phone}</div>
+                              <div>💬 WhatsApp: {req.whatsapp}</div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-red-650 font-black border border-red-100/40">
+                              {req.bloodGroup}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-700">{req.place}</div>
+                            <div className="text-[10px] text-slate-450 mt-0.5">{req.district} District</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-[10px] text-slate-500">
+                              {req.age ? `Age: ${req.age}` : "Age: N/A"}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              {req.gender ? `Gender: ${req.gender}` : "Gender: N/A"}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                              req.status === "Approved" ? "bg-emerald-50 text-emerald-705 border border-emerald-150" :
+                              req.status === "Rejected" ? "bg-rose-50 text-rose-705 border border-rose-150" :
+                              "bg-amber-50 text-amber-705 border border-amber-150"
+                            }`}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {req.status === "Pending" && (
+                                <>
+                                  <button
+                                    onClick={() => handleApproveOutsiderRequest(req)}
+                                    className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-650 transition"
+                                    title="Approve Request"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectOutsiderRequest(req)}
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-650 transition"
+                                    title="Reject Request"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => handleDeleteItem("outsiderBloodDonorRequests", req.id, req.name)}
+                                className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+                                title="Delete Entry"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               );
             })()}
