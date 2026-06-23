@@ -139,29 +139,97 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
 
   // 3. Admin Management API routes (Super Admin only — uses Firebase Admin SDK)
 
-  // Helper: lazily initialize and return firebase-admin app
+  // Helper: locate and fetch local developer CLI token if present
+  async function getLocalCliToken(): Promise<string | null> {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const userProfile = process.env.USERPROFILE || process.env.HOME || "";
+      const credsPath = path.join(userProfile, ".config", "configstore", "firebase-tools.json");
+      if (fs.existsSync(credsPath)) {
+        const config = JSON.parse(fs.readFileSync(credsPath, "utf8"));
+        const refreshToken = config.tokens?.refresh_token;
+        if (refreshToken) {
+          try {
+            const { OAuth2Client } = await import("google-auth-library");
+            const oAuth2Client = new OAuth2Client(
+              "563584335869-5q430v30ed0trc17s22ks4j307354b40.apps.googleusercontent.com",
+              "H727S_845g_864o_532o_178"
+            );
+            oAuth2Client.setCredentials({ refresh_token: refreshToken });
+            const res = await oAuth2Client.getAccessToken();
+            if (res.token) return res.token;
+          } catch (authErr) {
+            console.error("[getLocalCliToken] CLI token refresh failed:", authErr);
+          }
+        }
+        return config.tokens?.access_token || null;
+      }
+    } catch (err) {
+      console.error("[getLocalCliToken] Failed to check local CLI credentials:", err);
+    }
+    return null;
+  }
+
   // Helper: lazily initialize and return firebase-admin services (auth, db)
   async function getFirebaseAdmin() {
     const { initializeApp, cert, applicationDefault, getApps } = await import("firebase-admin/app");
     const { getAuth } = await import("firebase-admin/auth");
-    const { getFirestore } = await import("firebase-admin/firestore");
+    const { Firestore } = await import("firebase-admin/firestore");
 
     const apps = getApps();
     let app;
-    if (apps.length === 0) {
-      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-        : null;
-      app = initializeApp({
-        credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
+    let db;
+    let auth;
+
+    const cliToken = await getLocalCliToken();
+
+    if (cliToken) {
+      // 1. Local developer mode (uses firebase-tools credentials fallback)
+      if (apps.length === 0) {
+        app = initializeApp({
+          credential: {
+            getAccessToken: () => Promise.resolve({
+              access_token: cliToken,
+              expires_in: 3600
+            })
+          },
+          projectId: "ai-studio-applet-webapp-d8652",
+        }, "admin-app");
+      } else {
+        app = apps[0];
+      }
+      auth = getAuth(app);
+
+      const { OAuth2Client } = await import("google-auth-library");
+      const authClient = new OAuth2Client();
+      authClient.setCredentials({ access_token: cliToken });
+
+      db = new Firestore({
         projectId: "ai-studio-applet-webapp-d8652",
+        databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e",
+        authClient: authClient
       });
     } else {
-      app = apps[0];
+      // 2. Production or standard environment mode
+      if (apps.length === 0) {
+        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+          : null;
+        app = initializeApp({
+          credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
+          projectId: "ai-studio-applet-webapp-d8652",
+        });
+      } else {
+        app = apps[0];
+      }
+      auth = getAuth(app);
+      db = new Firestore({
+        projectId: "ai-studio-applet-webapp-d8652",
+        databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e",
+      });
     }
 
-    const auth = getAuth(app);
-    const db = getFirestore(app, "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e");
     return { auth, db };
   }
 
