@@ -5,10 +5,11 @@ interface NavbarProps {
   setTab: (tab: string) => void;
   isAdminLoggedIn: boolean;
   onLogout: () => void;
+  isUnderMaintenance?: boolean;
 }
 
-export default function Navbar({ currentTab, setTab, isAdminLoggedIn, onLogout }: NavbarProps) {
-  const navItems = [
+export default function Navbar({ currentTab, setTab, isAdminLoggedIn, onLogout, isUnderMaintenance }: NavbarProps) {
+  const navItems = isUnderMaintenance ? [] : [
     { id: "home", label: "Home", icon: Home },
     { id: "notices", label: "Notices", icon: Bell },
     { id: "ai", label: "AI Assistant", icon: MessageSquareCode },

@@ -204,6 +204,7 @@ export interface AdminPermissions {
   backupReports: boolean;
   securityCenter: boolean;
   messages: boolean;
+  siteControl: boolean;
 }
 
 export interface AdminUser {
@@ -248,6 +249,10 @@ export interface Announcement {
   title: string;
   content: string;
   type: "global" | "emergency";
+  priority: "normal" | "important" | "emergency";
+  bgColor?: string;
+  textColor?: string;
+  borderColor?: string;
   publishDate: string;
   scheduleTime?: string;
 }
@@ -281,4 +286,22 @@ export interface ConversationMeta {
   unreadCount: number;
 }
 
+export interface MaintenanceSettings {
+  maintenanceMode: boolean;
+  allowAdminAccess: boolean;
+  allowSupportAccess: boolean;
+  allowStudentAccess: boolean;
+  estimatedReturnTime?: string;
+  lastUpdated: string;
+}
 
+export interface MaintenanceLog {
+  id?: string;
+  activatedBy: string;
+  activatedDate: string;
+  activatedTime: string;
+  disabledBy: string;
+  disabledDate: string;
+  disabledTime: string;
+  createdAt: string;
+}

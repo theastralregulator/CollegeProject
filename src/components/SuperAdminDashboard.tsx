@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import {
   Users, Bell, GraduationCap, ClipboardList, BookOpen, FileText, Droplet, Clock, MessageSquare, ShieldCheck, AlertCircle, ArrowUpRight
@@ -27,6 +27,20 @@ export default function SuperAdminDashboard() {
     notes: 0, assignments: 0, qpapers: 0, admins: 0, studentAdmins: 0, pendingRequests: 0, pendingComplaints: 0
   });
   const [loading, setLoading] = useState(true);
+  const [maintenanceActive, setMaintenanceActive] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "systemSettings", "maintenance"), (snap) => {
+      if (snap.exists()) {
+        setMaintenanceActive(snap.data().maintenanceMode === true);
+      } else {
+        setMaintenanceActive(false);
+      }
+    }, (err) => {
+      console.error("[SuperAdminDashboard] Maintenance listener error:", err);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -120,14 +134,30 @@ export default function SuperAdminDashboard() {
   return (
     <div className="space-y-6 animate-fade-in text-xs">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-indigo-600" />
-          Super Admin Console
-        </h3>
-        <p className="text-xs text-slate-400 font-semibold mt-0.5">
-          Real-time metrics, analytics, system health indicators, and registration stats.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-indigo-600" />
+            Super Admin Console
+          </h3>
+          <p className="text-xs text-slate-400 font-semibold mt-0.5">
+            Real-time metrics, analytics, system health indicators, and registration stats.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-2xs shrink-0 select-none">
+          <span className="font-extrabold text-[10px] text-slate-500 uppercase tracking-wider">Site Status:</span>
+          {maintenanceActive ? (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-red-650 bg-red-50 border border-red-100 px-2.5 py-1 rounded-xl">
+              <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+              🔴 Maintenance Mode Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-xl">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              🟢 Site Online
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Grid of stats */}

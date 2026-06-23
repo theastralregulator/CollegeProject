@@ -8,11 +8,39 @@ export default function AnnouncementCenter() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [type, setType] = useState<"global" | "emergency">("global");
+  const [priority, setPriority] = useState<"normal" | "important" | "emergency">("normal");
+  const [colorPreset, setColorPreset] = useState<"info" | "success" | "warning" | "emergency" | "special" | "custom">("info");
+  const [bgColor, setBgColor] = useState("#eff6ff");
+  const [textColor, setTextColor] = useState("#1d4ed8");
+  const [borderColor, setBorderColor] = useState("#bfdbfe");
   const [scheduleTime, setScheduleTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  const PRESET_COLORS = {
+    info: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+    success: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
+    warning: { bg: "#fff7ed", text: "#c2410c", border: "#ffedd5" },
+    emergency: { bg: "#fef2f2", text: "#b91c1c", border: "#fecaca" },
+    special: { bg: "#faf5ff", text: "#7e22ce", border: "#e9d5ff" }
+  };
+
+  useEffect(() => {
+    if (priority === "emergency") {
+      setColorPreset("emergency");
+      setBgColor(PRESET_COLORS.emergency.bg);
+      setTextColor(PRESET_COLORS.emergency.text);
+      setBorderColor(PRESET_COLORS.emergency.border);
+    } else if (colorPreset !== "custom") {
+      const colors = PRESET_COLORS[colorPreset];
+      if (colors) {
+        setBgColor(colors.bg);
+        setTextColor(colors.text);
+        setBorderColor(colors.border);
+      }
+    }
+  }, [colorPreset, priority]);
 
   useEffect(() => {
     const q = query(collection(db, "announcements"), orderBy("publishDate", "desc"));
@@ -38,7 +66,11 @@ export default function AnnouncementCenter() {
       const payload: Omit<Announcement, "id"> = {
         title: title.trim(),
         content: content.trim(),
-        type,
+        type: priority === "emergency" ? "emergency" : "global",
+        priority,
+        bgColor,
+        textColor,
+        borderColor,
         publishDate: new Date().toISOString(),
         ...(scheduleTime ? { scheduleTime } : {})
       };
@@ -48,6 +80,8 @@ export default function AnnouncementCenter() {
       setTitle("");
       setContent("");
       setScheduleTime("");
+      setPriority("normal");
+      setColorPreset("info");
     } catch (err: any) {
       setToast({ type: "error", msg: err.message || "Broadcast failed." });
       setTimeout(() => setToast(null), 4000);
@@ -120,28 +154,108 @@ export default function AnnouncementCenter() {
               />
             </div>
             <div>
-              <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Announcement Type</label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <button
-                  type="button"
-                  onClick={() => setType("global")}
-                  className={`py-2 rounded-xl border font-bold text-center transition ${
-                    type === "global" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-500"
-                  }`}
-                >
-                  Global Info
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setType("emergency")}
-                  className={`py-2 rounded-xl border font-bold text-center transition flex items-center justify-center gap-1 ${
-                    type === "emergency" ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-slate-200 text-slate-500"
-                  }`}
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" /> Emergency
-                </button>
+              <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Priority Level</label>
+              <div className="grid grid-cols-3 gap-1.5 mt-1">
+                {[
+                  { id: "normal", label: "Normal" },
+                  { id: "important", label: "Important" },
+                  { id: "emergency", label: "Emergency", icon: AlertTriangle }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = priority === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setPriority(item.id as any)}
+                      className={`py-2 rounded-xl border font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer ${
+                        isActive 
+                          ? item.id === "emergency" 
+                            ? "bg-red-50 border-red-200 text-red-700 font-extrabold" 
+                            : item.id === "important"
+                              ? "bg-amber-50 border-amber-200 text-amber-700 font-extrabold"
+                              : "bg-indigo-50 border-indigo-200 text-indigo-700 font-extrabold"
+                          : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                      }`}
+                    >
+                      {Icon && <Icon className="h-3.5 w-3.5" />}
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            <div>
+              <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Theme Color Schema</label>
+              <div className="grid grid-cols-3 gap-1.5 mt-1">
+                {[
+                  { id: "info", label: "Blue (Info)" },
+                  { id: "success", label: "Green (Success)" },
+                  { id: "warning", label: "Orange (Warn)" },
+                  { id: "emergency", label: "Red (Alert)" },
+                  { id: "special", label: "Purple (Event)" },
+                  { id: "custom", label: "Custom Hex" }
+                ].map((item) => {
+                  const isActive = colorPreset === item.id;
+                  const isDisabled = priority === "emergency" && item.id !== "emergency";
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => setColorPreset(item.id as any)}
+                      className={`py-2 rounded-xl border font-bold text-center transition cursor-pointer text-[10px] ${
+                        isActive 
+                          ? "bg-slate-800 border-slate-900 text-white font-extrabold" 
+                          : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {colorPreset === "custom" && (
+              <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 animate-fade-in">
+                <div className="text-center space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase">Background</label>
+                  <div className="flex items-center justify-center">
+                    <input 
+                      type="color" 
+                      value={bgColor} 
+                      onChange={(e) => setBgColor(e.target.value)}
+                      className="h-7 w-7 rounded-lg border border-slate-200 cursor-pointer p-0"
+                    />
+                  </div>
+                </div>
+                <div className="text-center space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase">Text Color</label>
+                  <div className="flex items-center justify-center">
+                    <input 
+                      type="color" 
+                      value={textColor} 
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="h-7 w-7 rounded-lg border border-slate-200 cursor-pointer p-0"
+                    />
+                  </div>
+                </div>
+                <div className="text-center space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase">Border Color</label>
+                  <div className="flex items-center justify-center">
+                    <input 
+                      type="color" 
+                      value={borderColor} 
+                      onChange={(e) => setBorderColor(e.target.value)}
+                      className="h-7 w-7 rounded-lg border border-slate-200 cursor-pointer p-0"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Schedule Release (Optional)</label>
               <input
@@ -154,7 +268,7 @@ export default function AnnouncementCenter() {
             <button
               type="submit"
               disabled={publishing || !title.trim() || !content.trim()}
-              className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white py-3 font-bold transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white py-3 font-bold transition disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
             >
               {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
               {scheduleTime ? "Schedule Notice" : "Broadcast Notice"}
@@ -176,27 +290,46 @@ export default function AnnouncementCenter() {
               {announcements.map((ann) => (
                 <div
                   key={ann.id}
-                  className={`rounded-2xl border p-4 flex gap-3 items-start ${
-                    ann.type === "emergency" ? "bg-red-50/50 border-red-100" : "bg-slate-50/50 border-slate-100"
-                  }`}
+                  className="rounded-2xl border p-4 flex gap-3 items-start transition"
+                  style={{
+                    backgroundColor: ann.bgColor || (ann.priority === "emergency" ? "#fef2f2" : "#f8fafc"),
+                    color: ann.textColor || (ann.priority === "emergency" ? "#b91c1c" : "#334155"),
+                    borderColor: ann.borderColor || (ann.priority === "emergency" ? "#fecaca" : "#e2e8f0")
+                  }}
                 >
-                  <span className={`p-2 rounded-xl shrink-0 ${
-                    ann.type === "emergency" ? "bg-red-100 text-red-700" : "bg-indigo-100 text-indigo-700"
-                  }`}>
-                    {ann.type === "emergency" ? <AlertTriangle className="h-4 w-4" /> : <Megaphone className="h-4 w-4" />}
+                  <span 
+                    className="p-2 rounded-xl shrink-0 border bg-white/85 shadow-2xs"
+                    style={{ borderColor: ann.borderColor || "inherit" }}
+                  >
+                    {ann.priority === "emergency" ? (
+                      <AlertTriangle className="h-4 w-4 text-red-650" />
+                    ) : (
+                      <Megaphone className="h-4 w-4 text-slate-600" />
+                    )}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-black text-slate-800 text-sm truncate">{ann.title}</p>
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <p className="font-black text-sm truncate">{ann.title}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          ann.priority === "emergency" ? "bg-red-200 text-red-800" :
+                          ann.priority === "important" ? "bg-amber-100 text-amber-800" :
+                          "bg-slate-200/60 text-slate-600"
+                        }`}>
+                          {ann.priority || "Normal"}
+                        </span>
+                      </div>
                       <button
                         onClick={() => handleDelete(ann.id)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-red-600 transition hover:bg-slate-100 shrink-0"
+                        className="p-1 rounded-lg text-slate-400 hover:text-red-650 transition hover:bg-slate-100/60 shrink-0 cursor-pointer"
                         title="Delete Announcement"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <p className="text-slate-600 font-semibold mt-1 leading-relaxed">{ann.content}</p>
+                    <p className="font-semibold mt-1 leading-relaxed text-[11px]" style={{ color: ann.textColor || "inherit" }}>
+                      {ann.content}
+                    </p>
                     <div className="flex items-center gap-3 mt-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />

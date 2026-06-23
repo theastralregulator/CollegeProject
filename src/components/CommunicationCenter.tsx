@@ -5,11 +5,13 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, auth, storage } from "../firebase";
+import { User as AuthUser } from "firebase/auth";
 import { Message, ConversationMeta, AdminUser, AdminRole } from "../types";
 import { 
   Send, Paperclip, Search, Trash2, Pin, AlertCircle, 
   Check, CheckCheck, Megaphone, User, Loader2, Star, 
-  Bell, Volume2, ShieldAlert, Sparkles, X, FileText, Image as ImageIcon
+  Bell, Volume2, ShieldAlert, Sparkles, X, FileText, Image as ImageIcon,
+  Plus
 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -26,11 +28,16 @@ const ROLE_COLORS: Record<string, string> = {
   super_admin: "bg-purple-100 text-purple-700",
 };
 
-export default function CommunicationCenter() {
-  const currentUser = auth.currentUser;
-  const [currentUserRole, setCurrentUserRole] = useState<AdminRole | null>(null);
-  const [currentUserName, setCurrentUserName] = useState<string>("Admin");
-  const [loading, setLoading] = useState(true);
+interface CommunicationCenterProps {
+  user: AuthUser | null;
+  adminData: AdminUser | null;
+}
+
+export default function CommunicationCenter({ user, adminData }: CommunicationCenterProps) {
+  const currentUser = user;
+  const currentUserRole = adminData?.role || null;
+  const currentUserName = adminData?.name || "Admin";
+  const loading = !adminData;
 
   // Messaging States
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,22 +61,11 @@ export default function CommunicationCenter() {
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  // New Chat Modal State
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [newChatSearchQuery, setNewChatSearchQuery] = useState("");
 
-  // 1. Fetch Current User Role and Info
-  useEffect(() => {
-    if (!currentUser) return;
-    const userDocRef = doc(db, "users", currentUser.uid);
-    const unsub = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCurrentUserRole(data.role as AdminRole);
-        setCurrentUserName(data.fullName || data.name || "Admin");
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, [currentUser]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // 2. Super Admin: Load all conversations & users
   useEffect(() => {
@@ -138,15 +134,13 @@ export default function CommunicationCenter() {
       // Super Admin reads messages in conversation with the active user
       q = query(
         collection(db, "messages"),
-        where("participantIds", "array-contains", activeChatAdmin.uid),
-        orderBy("createdAt", "asc")
+        where("participantIds", "array-contains", activeChatAdmin.uid)
       );
     } else {
       // Normal admin reads messages in conversation with Super Admin
       q = query(
         collection(db, "messages"),
-        where("participantIds", "array-contains", currentUser.uid),
-        orderBy("createdAt", "asc")
+        where("participantIds", "array-contains", currentUser.uid)
       );
     }
 
@@ -173,6 +167,10 @@ export default function CommunicationCenter() {
           });
         }
       });
+
+      // Sort in-memory to avoid requiring Firestore composite indexes
+      list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      
       setMessages(list);
 
       // Auto scroll to bottom
@@ -193,6 +191,8 @@ export default function CommunicationCenter() {
       } else if (currentUserRole !== "super_admin") {
         updateDoc(doc(db, "conversations", currentUser.uid), { unreadCount: 0 }).catch(() => {});
       }
+    }, (err) => {
+      console.error("[CommunicationCenter] messages snapshot error:", err);
     });
 
     return unsub;
@@ -454,6 +454,22 @@ export default function CommunicationCenter() {
     return true;
   });
 
+  // Include a virtual item if we started a new chat with an admin who has no messages yet
+  const displayConversations = [...filteredConversations];
+  if (activeChatAdmin && !filteredConversations.some(c => c.adminUid === activeChatAdmin.uid)) {
+    displayConversations.unshift({
+      id: activeChatAdmin.uid,
+      adminUid: activeChatAdmin.uid,
+      adminName: activeChatAdmin.name,
+      adminRole: activeChatAdmin.role,
+      pinned: false,
+      isImportant: false,
+      lastMessage: "No messages yet. Send a message to start.",
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0
+    });
+  }
+
   return (
     <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6 text-xs animate-fade-in">
       {/* Header */}
@@ -488,16 +504,25 @@ export default function CommunicationCenter() {
           {/* Left panel: chats listing */}
           <div className="border-r border-slate-100 bg-white flex flex-col h-full">
             <div className="p-4 space-y-3 border-b border-slate-50">
-              {/* Search bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-3.5 h-3.5 w-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search user, role, message..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-slate-150 pl-9 pr-4 py-2.5 font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-purple-500"
-                />
+              {/* Search bar & New Chat Button */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search user, role..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-slate-150 pl-9 pr-3 py-2 font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-purple-500 text-[11px]"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowNewChatModal(true)}
+                  className="p-2 rounded-xl bg-purple-600 hover:bg-purple-755 text-white font-bold transition flex items-center justify-center shrink-0 shadow-3xs cursor-pointer animate-fade-in"
+                  title="New Conversation"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               </div>
               
               {/* Conversation list filters */}
@@ -520,10 +545,10 @@ export default function CommunicationCenter() {
 
             {/* Chats list */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
-              {filteredConversations.length === 0 ? (
+              {displayConversations.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 font-bold">No active conversations found.</div>
               ) : (
-                filteredConversations.map((c) => {
+                displayConversations.map((c) => {
                   const isActive = activeChatAdmin?.uid === c.adminUid;
                   return (
                     <div
@@ -958,6 +983,87 @@ export default function CommunicationCenter() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW CHAT MODAL ── */}
+      {showNewChatModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <Plus className="h-4 w-4 text-purple-650" />
+                Start Chat with Administrator
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowNewChatModal(false);
+                  setNewChatSearchQuery("");
+                }} 
+                className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Search admins */}
+            <div className="relative">
+              <Search className="absolute left-3 top-3.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by name, role, email..."
+                value={newChatSearchQuery}
+                onChange={(e) => setNewChatSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2.5 font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-purple-500 text-[11px]"
+              />
+            </div>
+
+            {/* List of admins */}
+            <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1">
+              {(() => {
+                const query = newChatSearchQuery.toLowerCase().trim();
+                const filteredAdmins = users.filter((u) => {
+                  const nameMatch = u.name.toLowerCase().includes(query);
+                  const roleMatch = ROLE_LABELS[u.role]?.toLowerCase().includes(query) || false;
+                  const emailMatch = u.email.toLowerCase().includes(query);
+                  return nameMatch || roleMatch || emailMatch;
+                });
+
+                if (filteredAdmins.length === 0) {
+                  return (
+                    <div className="text-center py-6 text-slate-400 font-bold text-[10px]">
+                      No administrative users found.
+                    </div>
+                  );
+                }
+
+                return filteredAdmins.map((u) => (
+                  <div
+                    key={u.uid}
+                    onClick={() => {
+                      setActiveChatAdmin(u);
+                      setShowNewChatModal(false);
+                      setNewChatSearchQuery("");
+                    }}
+                    className="p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/20 flex items-center justify-between cursor-pointer transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-650 font-black text-[10px]">
+                        {u.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="font-extrabold text-slate-800 text-[11px] block">{u.name}</span>
+                        <span className="text-[9px] text-slate-400 font-semibold block">{u.email}</span>
+                      </div>
+                    </div>
+                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${ROLE_COLORS[u.role] || "bg-slate-100 text-slate-600"}`}>
+                      {ROLE_LABELS[u.role] || "Staff"}
+                    </span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </div>

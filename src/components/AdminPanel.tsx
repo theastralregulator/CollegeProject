@@ -29,7 +29,7 @@ import {
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
   Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart, Crown, Shield,
-  Settings, Megaphone, Database, DownloadCloud, History, MessageCircle
+  Settings, Megaphone, Database, DownloadCloud, History, MessageCircle, Power
 } from "lucide-react";
 import { useAdminRole } from "../hooks/useAdminRole";
 import AdminManagement from "./AdminManagement";
@@ -41,6 +41,7 @@ import BackupReportsView from "./BackupReportsView";
 import SecurityCenter from "./SecurityCenter";
 import ActivityLogsView from "./ActivityLogsView";
 import CommunicationCenter from "./CommunicationCenter";
+import SiteControlCenter from "./SiteControlCenter";
 
 
 interface AdminPanelProps {
@@ -106,7 +107,7 @@ export default function AdminPanel({
   // Active Admin Submenu
   const [activeSubTab, setActiveSubTab] = useState<
     "dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors" | "adminManagement" |
-    "activityLogs" | "systemSettings" | "announcements" | "databaseTools" | "backupReports" | "securityCenter" | "messages"
+    "activityLogs" | "systemSettings" | "announcements" | "databaseTools" | "backupReports" | "securityCenter" | "messages" | "siteControl"
   >("dashboard");
 
   // Role-based access
@@ -130,6 +131,18 @@ export default function AdminPanel({
     });
     return unsub;
   }, [user?.uid]);
+
+  // Scroll Fix: scroll window to top and reset container scrolls on sub-tab change
+  useEffect(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+    const containers = document.querySelectorAll(".overflow-y-auto");
+    containers.forEach((container) => {
+      container.scrollTop = 0;
+    });
+  }, [activeSubTab]);
 
   // Outsider Donor States
   const [extDonorSearchQuery, setExtDonorSearchQuery] = useState("");
@@ -1293,6 +1306,7 @@ export default function AdminPanel({
             { id: "backupReports", label: "Backup & Reports", icon: DownloadCloud, perm: "backupReports" },
             { id: "securityCenter", label: "Security Center", icon: Shield, perm: "securityCenter" },
             { id: "messages", label: unreadMessagesCount > 0 ? `Messages (${unreadMessagesCount})` : "Messages", icon: MessageCircle, perm: "messages" },
+            { id: "siteControl", label: "Site Control Center", icon: Power, perm: "siteControl" },
           ] as { id: string; label: string; icon: any; perm: string | null }[])
             .filter((sub) => {
               if (!sub.perm) return true; // dashboard always visible
@@ -1304,7 +1318,7 @@ export default function AdminPanel({
             const isSubActive = activeSubTab === sub.id;
             const isSuperOnly = [
               "adminManagement", "activityLogs", "systemSettings", 
-              "announcements", "databaseTools", "backupReports", "securityCenter"
+              "announcements", "databaseTools", "backupReports", "securityCenter", "siteControl"
             ].includes(sub.id);
             return (
               <button
@@ -4249,7 +4263,22 @@ export default function AdminPanel({
         {/* Messages Tab — Accessible to all admins */}
         {activeSubTab === "messages" && (
           <div className="animate-fade-in">
-            <CommunicationCenter />
+            <CommunicationCenter user={user} adminData={adminData} />
+          </div>
+        )}
+
+        {/* Site Control Center Tab — Super Admin Only */}
+        {activeSubTab === "siteControl" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <SiteControlCenter adminData={adminData} />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Power className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access the site control center.</p>
+              </div>
+            )}
           </div>
         )}
 

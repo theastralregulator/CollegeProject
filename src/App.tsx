@@ -12,7 +12,7 @@ import { auth, db, handleFirestoreError, OperationType } from "./firebase";
 import { seedAllCollections } from "./dataSeed";
 import { 
   Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, CollegeInformation, AttendanceRecord, Complaint,
-  OutsiderBloodDonor, OutsiderBloodDonorRequest
+  OutsiderBloodDonor, OutsiderBloodDonorRequest, Announcement
 } from "./types";
 
 // Component imports
@@ -28,13 +28,15 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { 
   AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter
 } from "./components/SubViews";
+import { useAdminRole } from "./hooks/useAdminRole";
+import HomeAnnouncementBanner from "./components/HomeAnnouncementBanner";
 
 // Icon imports
 import { 
   Sparkles, Search, Mic, ArrowRight, BookOpen, FileText, ClipboardList, 
   Droplet, RefreshCw, Layers, Shield, Volume2, HelpCircle, 
   GraduationCap, Download, ChevronRight, X, Heart, Building2, MapPin, Mail, Phone, Users,
-  Briefcase, PhoneCall, Clock, MessageSquare, Calendar
+  Briefcase, PhoneCall, Clock, MessageSquare, Calendar, Ban
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 // @ts-ignore
@@ -81,6 +83,15 @@ export default function App() {
   // Navigation tabs: 'home' | 'notices' | 'ai' | 'departments' | 'more' | 'admin'
   const [activeTab, setActiveTab] = useState<string>("home");
 
+  const [maintenanceSettings, setMaintenanceSettings] = useState<{
+    maintenanceMode: boolean;
+    allowAdminAccess: boolean;
+    estimatedReturnTime?: string;
+    lastUpdated: string;
+  } | null>(null);
+
+  const [showAdminLoginOnMaintenance, setShowAdminLoginOnMaintenance] = useState<boolean>(false);
+
   // Sub-tabs under 'more': 'about' | 'teachers' | 'students' | 'bloodbank' | 'academics'
   const [activeMoreSubTab, setActiveMoreSubTab] = useState<string>("about");
 
@@ -93,6 +104,7 @@ export default function App() {
 
   // Firestore Reactive state folders
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [departments, setDepartments] = useState<Department[]>(localFallbackDepartments);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -300,7 +312,16 @@ export default function App() {
         handleFirestoreError(error, OperationType.LIST, "noticeCategories");
         setLoading(false);
       });
-      unsubscribes.push(unsubCategories);
+      const unsubAnnouncements = onSnapshot(collection(db, "announcements"), (snap) => {
+        const list: Announcement[] = [];
+        snap.forEach((d) => {
+          list.push({ id: d.id, ...d.data() } as Announcement);
+        });
+        setAnnouncements(list);
+      }, (error) => {
+        console.error("Error observing announcements:", error);
+      });
+      unsubscribes.push(unsubAnnouncements);
     };
 
     // 1. Run seeding
@@ -338,6 +359,55 @@ export default function App() {
       unsubAuth();
     };
   }, []);
+
+  // 1. Resolve Admin Role from auth session
+  const { role: adminRole, adminData, loading: roleLoading } = useAdminRole(adminUser);
+
+  // 2. Realtime observer for maintenance settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "systemSettings", "maintenance"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        setMaintenanceSettings({
+          maintenanceMode: data.maintenanceMode ?? false,
+          allowAdminAccess: data.allowAdminAccess ?? true,
+          allowSupportAccess: data.allowSupportAccess ?? true,
+          allowStudentAccess: data.allowStudentAccess ?? true,
+          estimatedReturnTime: data.estimatedReturnTime ?? "",
+          lastUpdated: data.lastUpdated ?? new Date().toISOString()
+        });
+      } else {
+        setMaintenanceSettings({
+          maintenanceMode: false,
+          allowAdminAccess: true,
+          allowSupportAccess: true,
+          allowStudentAccess: true,
+          estimatedReturnTime: "",
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    }, (error) => {
+      console.error("[App] Maintenance observer failed:", error);
+    });
+    return unsub;
+  }, []);
+
+  const isUnderMaintenance = maintenanceSettings?.maintenanceMode === true;
+  const isAllowedAdmin = !!(adminUser && (
+    adminRole === "super_admin" || 
+    (adminRole === "admin" && maintenanceSettings?.allowAdminAccess === true) ||
+    (adminRole === "support_admin" && maintenanceSettings?.allowSupportAccess === true) ||
+    (adminRole === "student_admin" && maintenanceSettings?.allowStudentAccess === true)
+  ));
+  // Block access only if maintenance is active, and we are NOT currently resolving the allowed admin status
+  const isAccessBlocked = isUnderMaintenance && !isAllowedAdmin && !(adminUser && roleLoading);
+
+  // If under maintenance and the logged-in admin is allowed, lock them in the admin tab
+  useEffect(() => {
+    if (isUnderMaintenance && isAllowedAdmin && activeTab !== "admin") {
+      setActiveTab("admin");
+    }
+  }, [isUnderMaintenance, isAllowedAdmin, activeTab]);
 
   // Load complaints only for logged-in admin (real or mock fallback since auth console is restricted)
   useEffect(() => {
@@ -422,6 +492,151 @@ export default function App() {
     general: "bg-slate-100 text-slate-800",
   };
 
+  if (isAccessBlocked) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between font-sans selection:bg-purple-500 selection:text-white p-6 relative overflow-hidden">
+        {/* Decorative background gradients */}
+        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none" />
+
+        {/* Header / Brand */}
+        <header className="mx-auto max-w-7xl w-full flex items-center justify-between py-4 border-b border-slate-800">
+          <div>
+            <h1 className="text-md sm:text-lg font-black tracking-wider text-white uppercase leading-none">
+              GPTC Connect
+            </h1>
+            <p className="text-[9px] text-purple-400 tracking-widest font-black uppercase mt-0.5 leading-none">
+              Govt Polytechnic College Kaduthuruthy
+            </p>
+          </div>
+          {(showAdminLoginOnMaintenance || adminUser) && (
+            <button
+              onClick={() => {
+                setShowAdminLoginOnMaintenance(false);
+                if (adminUser) handleAdminLogout();
+              }}
+              className="text-[10px] font-black uppercase tracking-wider bg-slate-805 hover:bg-red-905/40 text-slate-300 hover:text-red-400 border border-slate-800 hover:border-red-900/60 px-4 py-2 rounded-xl transition duration-200 cursor-pointer"
+            >
+              {adminUser ? "Sign Out" : "Back to Status"}
+            </button>
+          )}
+        </header>
+
+        {/* Main content */}
+        <main className="flex-1 flex items-center justify-center py-12">
+          <div className="max-w-md w-full text-center space-y-6 animate-fade-in px-4">
+            {showAdminLoginOnMaintenance && !adminUser ? (
+              <div className="bg-slate-850/80 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-2xl text-left">
+                <AdminPanel 
+                  notices={notices}
+                  teachers={teachers}
+                  students={students}
+                  notes={notes}
+                  assignments={assignments}
+                  questionpapers={questionPapers}
+                  donors={donors}
+                  departments={departments}
+                  studentRequests={studentRequests}
+                  attendance={attendance}
+                  complaints={complaints}
+                  noticeCategories={categories}
+                  outsiderDonorRequests={outsiderDonorRequests}
+                  outsiderDonors={outsiderDonors}
+                  attendanceStats={attendanceStats}
+                  bloodBankStats={bloodBankStats}
+                  onRefreshData={() => {}}
+                  onLoginSuccess={(authU) => {
+                    setAdminUser(authU);
+                    setShowAdminLoginOnMaintenance(false);
+                  }}
+                  onLogoutSuccess={() => setAdminUser(null)}
+                />
+              </div>
+            ) : adminUser ? (
+              // Logged in but not allowed (e.g. admin when allowAdminAccess is off)
+              <div className="bg-slate-850/80 backdrop-blur-md rounded-3xl p-8 border border-slate-800 shadow-2xl space-y-5 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-950/40 border border-red-900/40 text-red-505 shadow-sm animate-pulse">
+                  <Ban className="h-6 w-6" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-md font-black text-white">Access Denied During Maintenance</h3>
+                  <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+                    Hello <span className="text-white font-bold">{adminData?.name || adminUser.email}</span>. Administrative access is currently disabled for your role ({{
+                      super_admin: "Super Admin",
+                      admin: "Admin",
+                      support_admin: "Support Admin",
+                      student_admin: "Student Admin"
+                    }[adminRole || ""] || adminRole || ""}). Only Super Admins can log in while maintenance mode is active.
+                  </p>
+                </div>
+                <button
+                  onClick={handleAdminLogout}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs font-bold transition active:scale-95 shadow-sm cursor-pointer"
+                >
+                  Sign Out of Account
+                </button>
+              </div>
+            ) : (
+              // Standard Maintenance View
+              <div className="space-y-6">
+                {/* Animated Glow Logo Icon */}
+                <div className="mx-auto relative flex h-20 w-20 items-center justify-center rounded-3xl bg-linear-to-br from-purple-600 to-indigo-650 text-white shadow-xl">
+                  <div className="absolute inset-0 rounded-3xl bg-purple-500/20 blur-md animate-pulse" />
+                  <GraduationCap className="h-10 w-10 relative z-10" />
+                </div>
+
+                <div className="space-y-3">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-950/50 text-purple-300 border border-purple-900/50">
+                    <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-ping" />
+                    System Maintenance
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                    Site Under Maintenance
+                  </h2>
+                  <p className="text-xs text-slate-400 font-semibold leading-relaxed px-4">
+                    We are currently performing system updates and improvements. Please try again later.
+                  </p>
+                </div>
+
+                {/* Status details card */}
+                <div className="bg-slate-850/50 backdrop-blur-xs rounded-2xl p-4 border border-slate-800 text-[11px] font-semibold text-slate-400 space-y-2 max-w-sm mx-auto">
+                  <div className="flex justify-between items-center">
+                    <span>Last Updated Time</span>
+                    <span className="text-slate-202">
+                      {maintenanceSettings?.lastUpdated ? new Date(maintenanceSettings.lastUpdated).toLocaleString() : new Date().toLocaleString()}
+                    </span>
+                  </div>
+                  {maintenanceSettings?.estimatedReturnTime && (
+                    <div className="flex justify-between items-center border-t border-slate-800/80 pt-2">
+                      <span>Estimated Return Time</span>
+                      <span className="text-purple-400 font-bold">{maintenanceSettings.estimatedReturnTime}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="mx-auto max-w-7xl w-full flex items-center justify-between py-4 border-t border-slate-800 text-[10px] font-semibold tracking-wider">
+          <p className="text-slate-500">
+            © 2026 Govt Polytechnic College Kaduthuruthy. All rights reserved.
+          </p>
+          {!showAdminLoginOnMaintenance && !adminUser && (
+            <span
+              onClick={() => setShowAdminLoginOnMaintenance(true)}
+              className="text-slate-950/20 hover:text-slate-800/60 cursor-pointer select-none transition-colors duration-200 font-bold"
+              title="Site Administration"
+            >
+              Administrator Access
+            </span>
+          )}
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20 md:pb-6">
       
@@ -431,6 +646,7 @@ export default function App() {
         setTab={(t) => setActiveTab(t)} 
         isAdminLoggedIn={!!adminUser}
         onLogout={handleAdminLogout}
+        isUnderMaintenance={isUnderMaintenance}
       />
 
       {/* Main Container */}
@@ -464,6 +680,9 @@ export default function App() {
                 className="space-y-10"
               >
                 
+                {/* Homepage Announcement Banner */}
+                <HomeAnnouncementBanner announcements={announcements} />
+
                 {/* Section 1: Hero Banner */}
                 <div className="relative overflow-hidden rounded-[24px] shadow-xl border border-slate-100 min-h-[480px] md:h-[520px] flex items-center group shrink-0 bg-slate-950">
                   {/* Full Background image (college building) */}
@@ -932,7 +1151,9 @@ export default function App() {
       </footer>
 
       {/* Bottom bar navigation menu */}
-      <BottomNav currentTab={activeTab} setTab={(t) => setActiveTab(t)} />
+      {!isUnderMaintenance && (
+        <BottomNav currentTab={activeTab} setTab={(t) => setActiveTab(t)} />
+      )}
 
 
     </div>

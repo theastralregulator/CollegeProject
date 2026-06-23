@@ -137,6 +137,20 @@ service cloud.firestore {
       allow update, delete: if false; // Logs cannot be modified or deleted
     }
 
+    // Maintenance Control settings - public read, write restricted to Super Admin
+    match /systemSettings/maintenance {
+      allow read: if true;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+
+    // Maintenance Logs - Super Admin only
+    match /maintenanceLogs/{logId} {
+      allow read, create: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+      allow update, delete: if false;
+    }
+
     // System Settings — public read, write restricted to authenticated admins
     match /systemSettings/{docId} {
       allow read: if true;
