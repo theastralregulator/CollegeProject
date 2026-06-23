@@ -122,6 +122,9 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     if (createForm.password.length < 6) {
       setCreateError("Password must be at least 6 characters."); return;
     }
+    if (!["student_admin", "admin", "super_admin"].includes(createForm.role)) {
+      setCreateError("Please select a valid admin role."); return;
+    }
     setIsCreating(true);
     try {
       const { getApps, initializeApp, getApp } = await import("firebase/app");
@@ -175,10 +178,19 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
       setShowCreate(false);
     } catch (err: any) {
       console.error("[Create Admin client-side] Error:", err);
-      setCreateError(err.message || "Failed to create admin.");
+      if (err.code === "auth/email-already-in-use") {
+        setCreateError("An account with this email address already exists.");
+      } else if (err.code === "auth/invalid-email") {
+        setCreateError("Please enter a valid email address.");
+      } else if (err.code === "auth/weak-password") {
+        setCreateError("The password must be stronger (at least 6 characters).");
+      } else {
+        setCreateError(err.message || "Failed to create admin.");
+      }
     } finally {
       setIsCreating(false);
     }
+
   };
 
   // ── OPEN EDIT DRAWER ──────────────────────────────────────────────────────
