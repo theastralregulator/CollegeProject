@@ -25,10 +25,19 @@ import {
 import { 
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
-  Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart, Crown, Shield
+  Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart, Crown, Shield,
+  Settings, Megaphone, Database, DownloadCloud, History
 } from "lucide-react";
 import { useAdminRole } from "../hooks/useAdminRole";
 import AdminManagement from "./AdminManagement";
+import SuperAdminDashboard from "./SuperAdminDashboard";
+import SystemSettingsView from "./SystemSettingsView";
+import AnnouncementCenter from "./AnnouncementCenter";
+import DatabaseToolsView from "./DatabaseToolsView";
+import BackupReportsView from "./BackupReportsView";
+import SecurityCenter from "./SecurityCenter";
+import ActivityLogsView from "./ActivityLogsView";
+
 
 interface AdminPanelProps {
   notices: Notice[];
@@ -91,7 +100,10 @@ export default function AdminPanel({
   const [customCategory, setCustomCategory] = useState("");
 
   // Active Admin Submenu
-  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors" | "adminManagement">("dashboard");
+  const [activeSubTab, setActiveSubTab] = useState<
+    "dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors" | "adminManagement" |
+    "activityLogs" | "systemSettings" | "announcements" | "databaseTools" | "backupReports" | "securityCenter"
+  >("dashboard");
 
   // Role-based access
   const { role, adminData, permissions, loading: roleLoading } = useAdminRole(user);
@@ -349,6 +361,25 @@ export default function AdminPanel({
     });
   };
 
+  // Helper to log administrative actions
+  const logAdminAction = async (actionText: string) => {
+    try {
+      const { addDoc, collection } = await import("firebase/firestore");
+      const today = new Date();
+      const userName = adminData?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
+      await addDoc(collection(db, "activityLogs"), {
+        userName,
+        role: role || "admin",
+        action: actionText,
+        date: today.toISOString().split("T")[0],
+        time: today.toTimeString().split(" ")[0],
+        userId: user?.uid || ""
+      });
+    } catch (err) {
+      console.error("[logAdminAction] Error writing audit log:", err);
+    }
+  };
+
   // General Generic Add Helper to Firestore
   const handleAddItem = async (collectionName: string, itemData: any, formResetFunc: () => void) => {
     try {
@@ -401,6 +432,10 @@ export default function AdminPanel({
       await setDoc(doc(db, collectionName, docId), fullData);
       formResetFunc();
       setInfoMessage(`Successfully added entry to collection list: ${collectionName}!`);
+      
+      const labelText = itemData.name || itemData.title || itemData.subject || docId;
+      await logAdminAction(`Added entry in ${collectionName}: "${labelText}"`);
+      
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Write error to Firestore database: ${err.message}`);
@@ -428,6 +463,7 @@ export default function AdminPanel({
         }
       }
       setInfoMessage(`✅ Record deleted successfully.`);
+      await logAdminAction(`Deleted record from ${col}: "${deleteConfirm.label || id}"`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Delete error: ${err.message}`);
@@ -441,6 +477,7 @@ export default function AdminPanel({
       await updateDoc(doc(db, "bloodBank", donor.id), {
         isAvailable: !donor.isAvailable
       });
+      await logAdminAction(`Toggled blood donor availability for ${donor.name} to ${!donor.isAvailable ? 'Available' : 'Unavailable'}`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Failed to update blood availability: ${err.message}`);
@@ -471,6 +508,7 @@ export default function AdminPanel({
       
       await setDoc(doc(db, "outsiderBloodDonors", req.id), donorData);
       setInfoMessage(`✅ Approved request and registered ${req.name} as external blood donor.`);
+      await logAdminAction(`Approved outsider blood donor request for ${req.name}`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Approval error: ${err.message}`);
@@ -485,6 +523,7 @@ export default function AdminPanel({
         status: "Rejected"
       });
       setInfoMessage(`❌ Rejected blood donor request for ${req.name}.`);
+      await logAdminAction(`Rejected outsider blood donor request for ${req.name}`);
       onRefreshData();
     } catch (err: any) {
       setAuthError(`Rejection error: ${err.message}`);
@@ -552,6 +591,7 @@ export default function AdminPanel({
       await setDoc(doc(db, "attendance", docId), record);
       setNewAttendance({ studentId: "", studentName: "", department: "computer", semester: 5, month: "June 2026", attendancePercentage: 85 });
       setInfoMessage("✅ Attendance record added successfully.");
+      await logAdminAction(`Added attendance record for student ${record.studentName} (${record.month})`);
       onRefreshData();
     } catch (err: any) {
       setAuthError("Failed to add attendance record: " + err.message);
@@ -1221,6 +1261,12 @@ export default function AdminPanel({
             { id: "outsiderDonors", label: "Outsider Donors", icon: Heart, perm: "outsiderDonors" },
             { id: "complaints", label: "Complaints", icon: MessageSquare, perm: "complaints" },
             { id: "adminManagement", label: "Admin Management", icon: Crown, perm: "adminManagement" },
+            { id: "activityLogs", label: "Activity Logs", icon: History, perm: "activityLogs" },
+            { id: "systemSettings", label: "System Settings", icon: Settings, perm: "systemSettings" },
+            { id: "announcements", label: "Announcement Center", icon: Megaphone, perm: "announcements" },
+            { id: "databaseTools", label: "Database Tools", icon: Database, perm: "databaseTools" },
+            { id: "backupReports", label: "Backup & Reports", icon: DownloadCloud, perm: "backupReports" },
+            { id: "securityCenter", label: "Security Center", icon: Shield, perm: "securityCenter" },
           ] as { id: string; label: string; icon: any; perm: string | null }[])
             .filter((sub) => {
               if (!sub.perm) return true; // dashboard always visible
@@ -1230,7 +1276,10 @@ export default function AdminPanel({
             .map((sub) => {
             const Icon = sub.icon;
             const isSubActive = activeSubTab === sub.id;
-            const isSuperOnly = sub.id === "adminManagement";
+            const isSuperOnly = [
+              "adminManagement", "activityLogs", "systemSettings", 
+              "announcements", "databaseTools", "backupReports", "securityCenter"
+            ].includes(sub.id);
             return (
               <button
                 key={sub.id}
@@ -1274,134 +1323,140 @@ export default function AdminPanel({
         {/* 1. Dashboard Sub-Tab */}
         {activeSubTab === "dashboard" && (
           <div className="space-y-6 animate-fade-in">
-            <h3 className="text-lg font-bold text-slate-800">Welcome to GPTC Connect Administration</h3>
-            
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-              {[
-                { label: "Total Students", count: students.length, color: "from-blue-600 to-sky-500", icon: GraduationCap },
-                { label: "Total Teachers", count: teachers.length, color: "from-orange-500 to-amber-500", icon: Users },
-                { label: "Total Notices", count: notices.length, color: "from-purple-600 to-indigo-500", icon: Bell },
-                { label: "Total Notes", count: notes.length, color: "from-emerald-600 to-teal-500", icon: BookOpen },
-                { label: "Total Homework", count: assignments.length, color: "from-rose-600 to-pink-500", icon: ClipboardList },
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+            {role === "super_admin" ? (
+              <SuperAdminDashboard />
+            ) : (
+              <>
+                <h3 className="text-lg font-bold text-slate-800">Welcome to GPTC Connect Administration</h3>
+                
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                  {[
+                    { label: "Total Students", count: students.length, color: "from-blue-600 to-sky-500", icon: GraduationCap },
+                    { label: "Total Teachers", count: teachers.length, color: "from-orange-500 to-amber-500", icon: Users },
+                    { label: "Total Notices", count: notices.length, color: "from-purple-600 to-indigo-500", icon: Bell },
+                    { label: "Total Notes", count: notes.length, color: "from-emerald-600 to-teal-500", icon: BookOpen },
+                    { label: "Total Homework", count: assignments.length, color: "from-rose-600 to-pink-500", icon: ClipboardList },
+                  ].map((card, i) => {
+                    const Icon = card.icon;
+                    return (
+                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Attendance Analytics Dashboard Row */}
-            <h4 className="text-sm font-extrabold text-slate-800 mt-6">Attendance Metrics Overview</h4>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[
-                { label: "Average Attendance", count: `${avgAttendance}%`, color: "from-blue-600 to-indigo-500", icon: Clock },
-                { label: "Students Above 90%", count: above90Count, color: "from-emerald-600 to-teal-500", icon: GraduationCap },
-                { label: "Students Below 75%", count: below75Count, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                { label: "Attendance Alerts", count: `${shortageAlertsCount} shortage`, color: "from-rose-600 to-pink-500", icon: AlertCircle, badge: "Shortage" }
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
-                    {card.badge && (
-                      <span className="absolute top-2 right-2 bg-red-100 text-red-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
-                        {card.badge}
-                      </span>
-                    )}
-                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+                {/* Attendance Analytics Dashboard Row */}
+                <h4 className="text-sm font-extrabold text-slate-800 mt-6">Attendance Metrics Overview</h4>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  {[
+                    { label: "Average Attendance", count: `${avgAttendance}%`, color: "from-blue-600 to-indigo-500", icon: Clock },
+                    { label: "Students Above 90%", count: above90Count, color: "from-emerald-600 to-teal-500", icon: GraduationCap },
+                    { label: "Students Below 75%", count: below75Count, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                    { label: "Attendance Alerts", count: `${shortageAlertsCount} shortage`, color: "from-rose-600 to-pink-500", icon: AlertCircle, badge: "Shortage" }
+                  ].map((card, i) => {
+                    const Icon = card.icon;
+                    return (
+                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                        {card.badge && (
+                          <span className="absolute top-2 right-2 bg-red-100 text-red-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                            {card.badge}
+                          </span>
+                        )}
+                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Complaints Analytics Dashboard Row */}
-            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 font-sans text-xs">
-              {[
-                { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
-                { label: "Pending Complaints", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
-                { label: "Under Review Complaints", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
-                { label: "Resolved Complaints", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle },
-                { label: "Anonymous Complaints", count: anonymousComplaintsCount, color: "from-slate-600 to-slate-500", icon: Lock }
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
-                    {card.badge && (
-                      <span className="absolute top-2 right-2 bg-amber-100 text-amber-850 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
-                        {card.badge}
-                      </span>
-                    )}
-                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+                {/* Complaints Analytics Dashboard Row */}
+                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 font-sans text-xs">
+                  {[
+                    { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
+                    { label: "Pending Complaints", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
+                    { label: "Under Review Complaints", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
+                    { label: "Resolved Complaints", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle },
+                    { label: "Anonymous Complaints", count: anonymousComplaintsCount, color: "from-slate-600 to-slate-500", icon: Lock }
+                  ].map((card, i) => {
+                    const Icon = card.icon;
+                    return (
+                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                        {card.badge && (
+                          <span className="absolute top-2 right-2 bg-amber-100 text-amber-850 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                            {card.badge}
+                          </span>
+                        )}
+                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Attendance Duplicate & Import Analytics Row */}
-            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Attendance Duplicate & Import Metrics</h4>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
-              {[
-                { label: "Total Attendance Students", count: new Set(attendance.map(a => a.studentId)).size, color: "from-sky-600 to-sky-500", icon: Users },
-                { label: "Imported Students", count: attendanceStats.importedStudentsCount, color: "from-blue-600 to-indigo-500", icon: ClipboardCheck },
-                { label: "Duplicate Records Found", count: attendanceStats.duplicateRecordsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                { label: "Duplicate Records Removed", count: attendanceStats.duplicateRecordsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+                {/* Attendance Duplicate & Import Analytics Row */}
+                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Attendance Duplicate & Import Metrics</h4>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+                  {[
+                    { label: "Total Attendance Students", count: new Set(attendance.map(a => a.studentId)).size, color: "from-sky-600 to-sky-500", icon: Users },
+                    { label: "Imported Students", count: attendanceStats.importedStudentsCount, color: "from-blue-600 to-indigo-500", icon: ClipboardCheck },
+                    { label: "Duplicate Records Found", count: attendanceStats.duplicateRecordsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                    { label: "Duplicate Records Removed", count: attendanceStats.duplicateRecordsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+                  ].map((card, i) => {
+                    const Icon = card.icon;
+                    return (
+                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Blood Bank Duplicate & Import Analytics Row */}
-            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Blood Bank Duplicate & Import Metrics</h4>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
-              {[
-                { label: "Total Student Donors", count: donors.length, color: "from-red-600 to-rose-500", icon: Droplet },
-                { label: "Total External Donors", count: outsiderDonors.length, color: "from-pink-600 to-rose-500", icon: Heart },
-                { label: "Duplicate Donors Found", count: bloodBankStats.duplicateDonorsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                { label: "Duplicate Donors Removed", count: bloodBankStats.duplicateDonorsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
-              ].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
+                {/* Blood Bank Duplicate & Import Analytics Row */}
+                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Blood Bank Duplicate & Import Metrics</h4>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+                  {[
+                    { label: "Total Student Donors", count: donors.length, color: "from-red-600 to-rose-500", icon: Droplet },
+                    { label: "Total External Donors", count: outsiderDonors.length, color: "from-pink-600 to-rose-500", icon: Heart },
+                    { label: "Duplicate Donors Found", count: bloodBankStats.duplicateDonorsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                    { label: "Duplicate Donors Removed", count: bloodBankStats.duplicateDonorsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+                  ].map((card, i) => {
+                    const Icon = card.icon;
+                    return (
+                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            <div className="rounded-2xl bg-linear-to-r from-blue-500 to-indigo-500 p-6 text-white">
-              <h4 className="text-md font-bold">Admin Knowledge Injection Control</h4>
-              <p className="mt-1 text-xs text-white/85 leading-relaxed font-medium">
-                GPTC Connect answers voice inquiries using direct access to Firestore data. Any changes, deletions, or notices added below will update the Live Gemini contextual answers instantly! Keep documents accurate and clean.
-              </p>
-            </div>
+                <div className="rounded-2xl bg-linear-to-r from-blue-500 to-indigo-500 p-6 text-white">
+                  <h4 className="text-md font-bold">Admin Knowledge Injection Control</h4>
+                  <p className="mt-1 text-xs text-white/85 leading-relaxed font-medium">
+                    GPTC Connect answers voice inquiries using direct access to Firestore data. Any changes, deletions, or notices added below will update the Live Gemini contextual answers instantly! Keep documents accurate and clean.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -4051,6 +4106,96 @@ export default function AdminPanel({
                 <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
                 <p className="text-sm font-black text-red-600">Access Denied</p>
                 <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can manage admin accounts.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Activity Logs Tab — Super Admin Only */}
+        {activeSubTab === "activityLogs" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <ActivityLogsView />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can view activity logs.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* System Settings Tab — Super Admin Only */}
+        {activeSubTab === "systemSettings" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <SystemSettingsView />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can view system settings.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Announcement Center Tab — Super Admin Only */}
+        {activeSubTab === "announcements" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <AnnouncementCenter />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access the announcement center.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Database Tools Tab — Super Admin Only */}
+        {activeSubTab === "databaseTools" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <DatabaseToolsView />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access database tools.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Backup Reports Tab — Super Admin Only */}
+        {activeSubTab === "backupReports" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <BackupReportsView />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access backup and reports.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Security Center Tab — Super Admin Only */}
+        {activeSubTab === "securityCenter" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <SecurityCenter />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access the security center.</p>
               </div>
             )}
           </div>

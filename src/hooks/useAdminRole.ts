@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -14,16 +14,19 @@ export const DEFAULT_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
     notices: false, teachers: false, students: false, attendance: false,
     notes: true, assignments: true, qpapers: true,
     bloodbank: false, requests: false, outsiderDonors: false, complaints: false, adminManagement: false,
+    activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
   },
   admin: {
     notices: true, teachers: true, students: true, attendance: true,
     notes: true, assignments: true, qpapers: true,
     bloodbank: true, requests: true, outsiderDonors: true, complaints: true, adminManagement: false,
+    activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
   },
   super_admin: {
     notices: true, teachers: true, students: true, attendance: true,
     notes: true, assignments: true, qpapers: true,
     bloodbank: true, requests: true, outsiderDonors: true, complaints: true, adminManagement: true,
+    activityLogs: true, systemSettings: true, announcements: true, databaseTools: true, backupReports: true, securityCenter: true,
   },
 };
 

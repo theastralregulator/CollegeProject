@@ -112,5 +112,25 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+
+    // Activity Logs — authenticated access only
+    match /activityLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false; // Logs cannot be modified or deleted
+    }
+
+    // System Settings — public read, write restricted to authenticated admins
+    match /systemSettings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Announcements — public read, write restricted to authenticated admins
+    match /announcements/{annId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }
+

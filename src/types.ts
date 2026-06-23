@@ -197,6 +197,12 @@ export interface AdminPermissions {
   outsiderDonors: boolean;
   complaints: boolean;
   adminManagement: boolean;
+  activityLogs: boolean;
+  systemSettings: boolean;
+  announcements: boolean;
+  databaseTools: boolean;
+  backupReports: boolean;
+  securityCenter: boolean;
 }
 
 export interface AdminUser {
@@ -210,4 +216,39 @@ export interface AdminUser {
   createdAt: string;
   createdBy?: string;
 }
+
+export interface ActivityLog {
+  id?: string;
+  userName: string;
+  role: string;
+  action: string;
+  date: string;
+  time: string;
+  userId?: string;
+}
+
+export interface SystemSettings {
+  siteName: string;
+  logo: string;
+  heroBanner: string;
+  contactEmail: string;
+  contactPhone: string;
+  address: string;
+  socialFb?: string;
+  socialTw?: string;
+  socialInsta?: string;
+  footerContent: string;
+  notificationEmail: string;
+  emailAlertsEnabled: boolean;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: "global" | "emergency";
+  publishDate: string;
+  scheduleTime?: string;
+}
+
 
