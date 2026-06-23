@@ -75,6 +75,27 @@ service cloud.firestore {
 
     // Complaints rules
     match /complaints/{complaintId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
+    // Outsider blood donor requests rules
+    match /outsiderBloodDonorRequests/{reqId} {
+      allow read, write: if true;
+    }
+
+    // Outsider blood donors rules
+    match /outsiderBloodDonors/{donorId} {
+      allow read, write: if true;
+    }
+
+    // Attendance stats rules
+    match /attendanceStats/{docId} {
+      allow read, write: if true;
+    }
+
+    // Blood bank stats rules
+    match /bloodBankStats/{docId} {
       allow read, write: if true;
     }
   }

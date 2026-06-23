@@ -303,12 +303,16 @@ export async function seedAllCollections() {
     }
 
     // 12. Complaints
-    const complaintsSnap = await getDocs(collection(db, "complaints"));
-    if (complaintsSnap.empty) {
-      console.log("Seeding complaints...");
-      for (const comp of mockComplaints) {
-        await setDoc(doc(db, "complaints", comp.complaintId), comp);
+    try {
+      const complaintsSnap = await getDocs(collection(db, "complaints"));
+      if (complaintsSnap.empty) {
+        console.log("Seeding complaints...");
+        for (const comp of mockComplaints) {
+          await setDoc(doc(db, "complaints", comp.complaintId), comp);
+        }
       }
+    } catch (e) {
+      console.info("Skipping complaints seeding (restricted to authenticated admins).");
     }
 
     console.log("Successfully validated and seeded Firebase Firestore databases!");

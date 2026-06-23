@@ -3,13 +3,16 @@ import {
   collection, 
   onSnapshot, 
   query, 
-  orderBy 
+  orderBy,
+  doc,
+  setDoc
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from "./firebase";
 import { seedAllCollections } from "./dataSeed";
 import { 
-  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, CollegeInformation, AttendanceRecord, Complaint 
+  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, CollegeInformation, AttendanceRecord, Complaint,
+  OutsiderBloodDonor, OutsiderBloodDonorRequest
 } from "./types";
 
 // Component imports
@@ -21,9 +24,9 @@ import AdminPanel from "./components/AdminPanel";
 import DepartmentView from "./components/DepartmentView";
 import AttendanceView from "./components/AttendanceView";
 import ComplaintView from "./components/ComplaintView";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { 
-  AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter,
-  FacilitiesView, PlacementView, ContactView
+  AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter
 } from "./components/SubViews";
 
 // Icon imports
@@ -31,7 +34,7 @@ import {
   Sparkles, Search, Mic, ArrowRight, BookOpen, FileText, ClipboardList, 
   Droplet, RefreshCw, Layers, Shield, Volume2, HelpCircle, 
   GraduationCap, Download, ChevronRight, X, Heart, Building2, MapPin, Mail, Phone, Users,
-  Briefcase, PhoneCall, Clock, MessageSquare
+  Briefcase, PhoneCall, Clock, MessageSquare, Calendar
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 // @ts-ignore
@@ -102,6 +105,17 @@ export default function App() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [collegeInfo, setCollegeInfo] = useState<CollegeInformation[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [outsiderDonors, setOutsiderDonors] = useState<OutsiderBloodDonor[]>([]);
+  const [outsiderDonorRequests, setOutsiderDonorRequests] = useState<OutsiderBloodDonorRequest[]>([]);
+  const [attendanceStats, setAttendanceStats] = useState({
+    importedStudentsCount: 0,
+    duplicateRecordsFound: 0,
+    duplicateRecordsRemoved: 0
+  });
+  const [bloodBankStats, setBloodBankStats] = useState({
+    duplicateDonorsFound: 0,
+    duplicateDonorsRemoved: 0
+  });
 
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -218,14 +232,64 @@ export default function App() {
       });
       unsubscribes.push(unsubAttendance);
 
-      const unsubComplaints = onSnapshot(collection(db, "complaints"), (snap) => {
-        const list: Complaint[] = [];
-        snap.forEach(d => list.push(d.data() as Complaint));
-        setComplaints(list);
+      const unsubOutsiderDonors = onSnapshot(collection(db, "outsiderBloodDonors"), (snap) => {
+        const list: OutsiderBloodDonor[] = [];
+        snap.forEach(d => list.push(d.data() as OutsiderBloodDonor));
+        setOutsiderDonors(list);
       }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, "complaints");
+        handleFirestoreError(error, OperationType.LIST, "outsiderBloodDonors");
       });
-      unsubscribes.push(unsubComplaints);
+      unsubscribes.push(unsubOutsiderDonors);
+
+      const unsubOutsiderRequests = onSnapshot(collection(db, "outsiderBloodDonorRequests"), (snap) => {
+        const list: OutsiderBloodDonorRequest[] = [];
+        snap.forEach(d => list.push(d.data() as OutsiderBloodDonorRequest));
+        setOutsiderDonorRequests(list);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, "outsiderBloodDonorRequests");
+      });
+      unsubscribes.push(unsubOutsiderRequests);
+
+      const unsubStats = onSnapshot(doc(db, "attendanceStats", "summary"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setAttendanceStats({
+            importedStudentsCount: data.importedStudentsCount || 0,
+            duplicateRecordsFound: data.duplicateRecordsFound || 0,
+            duplicateRecordsRemoved: data.duplicateRecordsRemoved || 0
+          });
+        } else {
+          setDoc(doc(db, "attendanceStats", "summary"), {
+            importedStudentsCount: 0,
+            duplicateRecordsFound: 0,
+            duplicateRecordsRemoved: 0
+          }).catch(err => console.error("Error initializing stats:", err));
+        }
+      }, (error) => {
+        console.error("Error observing stats:", error);
+      });
+      unsubscribes.push(unsubStats);
+
+      const unsubBloodBankStats = onSnapshot(doc(db, "bloodBankStats", "summary"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setBloodBankStats({
+            duplicateDonorsFound: data.duplicateDonorsFound || 0,
+            duplicateDonorsRemoved: data.duplicateDonorsRemoved || 0
+          });
+        } else {
+          setDoc(doc(db, "bloodBankStats", "summary"), {
+            duplicateDonorsFound: 0,
+            duplicateDonorsRemoved: 0
+          }).catch(err => console.error("Error initializing blood bank stats:", err));
+        }
+      }, (error) => {
+        console.error("Error observing stats:", error);
+      });
+      unsubscribes.push(unsubBloodBankStats);
+
+      // complaints listener removed from startup to prevent public permission issues.
+      // it is now managed via a separate useEffect hook.
 
       const unsubCategories = onSnapshot(collection(db, "noticeCategories"), (snap) => {
         const list: { id: string; name: string }[] = [];
@@ -275,6 +339,47 @@ export default function App() {
     };
   }, []);
 
+  // Load complaints only for logged-in admin (real or mock fallback since auth console is restricted)
+  useEffect(() => {
+    if (!adminUser) {
+      console.log("[Complaints Listener] Skip subscribing: no admin session active.");
+      setComplaints([]);
+      return;
+    }
+
+    console.log("[Complaints Listener] Starting realtime listener on 'complaints' collection for user:", adminUser.email);
+    const unsub = onSnapshot(collection(db, "complaints"), (snap) => {
+      const list: Complaint[] = [];
+      snap.forEach(d => {
+        const data = d.data() as Complaint;
+        // Check 6 mapping fallback
+        if (!data.id) {
+          data.id = data.complaintId || d.id;
+        }
+        if (!data.complaintId) {
+          data.complaintId = data.id;
+        }
+        if (!data.createdAt) {
+          data.createdAt = data.submittedAt || new Date().toISOString();
+        }
+        if (!data.submittedAt) {
+          data.submittedAt = data.createdAt;
+        }
+        list.push(data);
+      });
+      console.log(`[Complaints Listener] Read success! Count: ${list.length} documents fetched.`);
+      setComplaints(list);
+    }, (error) => {
+      console.error("[Complaints Listener] Firestore query error occurred:", error);
+      handleFirestoreError(error, OperationType.LIST, "complaints");
+    });
+
+    return () => {
+      console.log("[Complaints Listener] Cleaning up active listener.");
+      unsub();
+    };
+  }, [adminUser]);
+
   const handleAdminLogout = async () => {
     localStorage.removeItem("campusai_admin_email");
     await signOut(auth);
@@ -303,6 +408,11 @@ export default function App() {
     setActiveMoreSubTab(subId);
     setActiveTab("more");
   };
+
+  // Scroll to top on navigation changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [activeTab, activeMoreSubTab]);
 
   // Custom notice category badges
   const categoryThemes = {
@@ -453,11 +563,12 @@ export default function App() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-extrabold text-slate-405 pl-1 uppercase tracking-widest">Active Archives Quick access</h3>
                   
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                     {[
                       { id: "notes", title: "Syllabus Notes", subtitle: "Branch PDFs & texts", icon: BookOpen, color: "bg-blue-500", text: "text-blue-600", action: () => handleDeepAcademicNavigation("notes") },
                       { id: "papers", title: "Question Papers", subtitle: "Previous series", icon: FileText, color: "bg-indigo-500", text: "text-indigo-600", action: () => handleDeepAcademicNavigation("papers") },
                       { id: "assignments", title: "Active Assignments", subtitle: "Homework tracker", icon: ClipboardList, color: "bg-emerald-500", text: "text-emerald-600", action: () => handleDeepAcademicNavigation("assignments") },
+                      { id: "attendance", title: "Attendance Tracker", subtitle: "Check active status", icon: Calendar, color: "bg-amber-500", text: "text-amber-600", action: () => setActiveTab("attendance") },
                       { id: "bloodbank", title: "Blood Bank", subtitle: "Emergency donors", icon: Droplet, color: "bg-red-500", text: "text-red-600", action: () => handleQuickAccessNavigation("bloodbank") },
                       { id: "complaints", title: "Complaint Box", subtitle: "Submit feedback", icon: MessageSquare, color: "bg-purple-500", text: "text-purple-600", action: () => handleQuickAccessNavigation("complaints") },
                     ].map((card, idx) => {
@@ -634,10 +745,12 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <AttendanceView 
-                  attendance={attendance}
-                  departments={departments}
-                />
+                <ErrorBoundary>
+                  <AttendanceView 
+                    attendance={attendance}
+                    departments={departments}
+                  />
+                </ErrorBoundary>
               </motion.div>
             )}
 
@@ -661,9 +774,6 @@ export default function App() {
                     { id: "bloodbank", label: "Blood Bank", icon: Droplet },
                     { id: "attendance", label: "Attendance", icon: Clock },
                     { id: "complaints", label: "Complaint Box", icon: MessageSquare },
-                    { id: "facilities", label: "Facilities", icon: Layers },
-                    { id: "placement", label: "Placement", icon: Briefcase },
-                    { id: "contact", label: "Contact", icon: PhoneCall },
                     { id: "academics", label: "Downloads Center", icon: Download },
                   ].map((subItem) => {
                     const Icon = subItem.icon;
@@ -686,15 +796,12 @@ export default function App() {
                 </div>
 
                 <div>
-                  {activeMoreSubTab === "about" && <AboutView />}
+                  {activeMoreSubTab === "about" && <AboutView departments={departments} />}
                   {activeMoreSubTab === "teachers" && <TeachersView teachers={teachers} departments={departments} />}
                   {activeMoreSubTab === "students" && <StudentsView students={students} departments={departments} studentRequests={studentRequests} />}
-                  {activeMoreSubTab === "bloodbank" && <BloodBankView donors={donors} />}
+                  {activeMoreSubTab === "bloodbank" && <BloodBankView donors={donors} outsiderDonors={outsiderDonors} />}
                   {activeMoreSubTab === "attendance" && <AttendanceView attendance={attendance} departments={departments} />}
                   {activeMoreSubTab === "complaints" && <ComplaintView departments={departments} />}
-                  {activeMoreSubTab === "facilities" && <FacilitiesView />}
-                  {activeMoreSubTab === "placement" && <PlacementView />}
-                  {activeMoreSubTab === "contact" && <ContactView />}
                   {activeMoreSubTab === "academics" && (
                     <AcademicCenter 
                       initialType={academicInitialType} 
@@ -731,6 +838,10 @@ export default function App() {
                   attendance={attendance}
                   complaints={complaints}
                   noticeCategories={categories}
+                  outsiderDonorRequests={outsiderDonorRequests}
+                  outsiderDonors={outsiderDonors}
+                  attendanceStats={attendanceStats}
+                  bloodBankStats={bloodBankStats}
                   onRefreshData={() => {
                     // Reactive snapshot automatically syncing, but we trigger a log confirm.
                     console.log("Notifying admin dashboard update sync complete.");

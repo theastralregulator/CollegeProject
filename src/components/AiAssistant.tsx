@@ -51,6 +51,7 @@ export default function AiAssistant({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Initialize speech synth
   useEffect(() => {
@@ -74,6 +75,20 @@ export default function AiAssistant({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Reset window scroll to top when AI Assistant mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
+
+  // Reset scroll position for AI Assistant container on tab change
+  useEffect(() => {
+    // Assuming the parent component passes activeTab via props is not available here,
+    // but the component is rendered conditionally based on activeTab === "ai".
+    // When this component mounts (or re-mounts) we can reset its own scroll container.
+    messagesContainerRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, []);
+
 
   // Speech helper
   const speakText = (text: string) => {
@@ -485,8 +500,8 @@ export default function AiAssistant({
         </div>
       </div>
 
-      {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-[140px]">
+       {/* Messages Stream */}
+       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 min-h-[140px]">
         {messages.map((m, idx) => (
           <div
             key={idx}

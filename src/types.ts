@@ -136,6 +136,7 @@ export interface AttendanceRecord {
 
 export interface Complaint {
   complaintId: string;
+  id?: string;
   name: string;
   phoneNumber: string;
   email?: string;
@@ -148,7 +149,33 @@ export interface Complaint {
   status: 'Pending' | 'Under Review' | 'Resolved' | 'Rejected';
   adminRemarks: string;
   createdAt: string;
+  submittedAt?: string;
   updatedAt: string;
 }
 
+export interface OutsiderBloodDonor {
+  id: string;
+  name: string;
+  phone: string;
+  whatsapp: string;
+  bloodGroup: string;
+  place: string;
+  district: string;
+  age?: number;
+  gender?: string;
+  createdAt: string;
+}
 
+export interface OutsiderBloodDonorRequest {
+  id: string;
+  name: string;
+  phone: string;
+  whatsapp: string;
+  bloodGroup: string;
+  place: string;
+  district: string;
+  age?: number;
+  gender?: string;
+  status: "Pending" | "Approved" | "Rejected";
+  createdAt: string;
+}
