@@ -1,4 +1,4 @@
-import { Home, Bell, MessageSquareCode, GraduationCap, Grid3X3, ShieldCheck } from "lucide-react";
+import { Home, Bell, MessageSquareCode, GraduationCap, Grid3X3, ShieldCheck, Clock } from "lucide-react";
 
 interface NavbarProps {
   currentTab: string;
@@ -13,6 +13,7 @@ export default function Navbar({ currentTab, setTab, isAdminLoggedIn, onLogout }
     { id: "notices", label: "Notices", icon: Bell },
     { id: "ai", label: "AI Assistant", icon: MessageSquareCode },
     { id: "departments", label: "Departments", icon: GraduationCap },
+    { id: "attendance", label: "Attendance", icon: Clock },
     { id: "more", label: "More Features", icon: Grid3X3 },
   ];
 

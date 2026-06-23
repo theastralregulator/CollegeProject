@@ -1,6 +1,6 @@
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "./firebase";
-import { Department, Teacher, Student, Notice, Note, QuestionPaper, Assignment, BloodDonor, CollegeInformation } from "./types";
+import { Department, Teacher, Student, Notice, Note, QuestionPaper, Assignment, BloodDonor, CollegeInformation, AttendanceRecord, Complaint } from "./types";
 
 const mockDepartments: Department[] = [
   {
@@ -190,6 +190,12 @@ const mockCollegeInformation: CollegeInformation[] = [
     key: "admission",
     title: "Admission Information",
     content: "Admission Process:\n- Admissions to 3-year diploma programmes are through DTE Kerala centralised allotment.\n- Institution Code: 60.\n- Courses: Diploma in Computer Engineering, Diploma in Computer Hardware Engineering, Diploma in Electronics Engineering.\n- Intake: 60 students per course per year.\n- Eligibility: Class 10 pass (SSLC or equivalent).\n- Application through: www.polyadmission.org (DTE Kerala).\n- Reservations as per Government of Kerala norms.\n- For details contact: 04829 295131 or gptckaduthuruthy@gmail.com"
+  },
+  {
+    id: "complaints_info",
+    key: "complaints",
+    title: "Complaint Box & Grievance Redressal System",
+    content: "GPTC Kaduthuruthy provides a digital 'Complaint Box' where students can securely submit complaints, suggestion box entries, feedback, or grievances to the college administration. How to submit: Go to the 'Complaint Box' page in the 'More' menu or Home quick access. Complete the Complaint Form with Title, Category, and Description. Option to submit with identity or anonymously. Categories: Academic Issues, Faculty Related, Laboratory Issues, Infrastructure, Library, Examination, Attendance, Placement, Ragging Complaint, Suggestion, Other. Statuses track from Pending, Under Review, Resolved, to Rejected."
   }
 ];
 
@@ -287,9 +293,131 @@ export async function seedAllCollections() {
       }
     }
 
+    // 11. Attendance Records
+    const attendanceSnap = await getDocs(collection(db, "attendance"));
+    if (attendanceSnap.empty) {
+      console.log("Seeding attendance records...");
+      for (const att of mockAttendance) {
+        await setDoc(doc(db, "attendance", att.attendanceId), att);
+      }
+    }
+
+    // 12. Complaints
+    const complaintsSnap = await getDocs(collection(db, "complaints"));
+    if (complaintsSnap.empty) {
+      console.log("Seeding complaints...");
+      for (const comp of mockComplaints) {
+        await setDoc(doc(db, "complaints", comp.complaintId), comp);
+      }
+    }
+
     console.log("Successfully validated and seeded Firebase Firestore databases!");
   } catch (error) {
     console.error("Failed to seed college database: ", error);
     handleFirestoreError(error, OperationType.WRITE, "seeding");
   }
 }
+
+const mockAttendance: AttendanceRecord[] = [
+  {
+    attendanceId: "att_s1_june",
+    studentId: "s1",
+    studentName: "Adithya Sunil",
+    department: "computer",
+    semester: 5,
+    month: "June 2026",
+    attendancePercentage: 92,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    attendanceId: "att_s1_july",
+    studentId: "s1",
+    studentName: "Adithya Sunil",
+    department: "computer",
+    semester: 5,
+    month: "July 2026",
+    attendancePercentage: 88,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    attendanceId: "att_s2_june",
+    studentId: "s2",
+    studentName: "Anjali Krishna",
+    department: "computer",
+    semester: 5,
+    month: "June 2026",
+    attendancePercentage: 72,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    attendanceId: "att_s3_june",
+    studentId: "s3",
+    studentName: "Gautham S.",
+    department: "hardware",
+    semester: 3,
+    month: "June 2026",
+    attendancePercentage: 95,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    attendanceId: "att_s4_june",
+    studentId: "s4",
+    studentName: "Fathima R.",
+    department: "electronics",
+    semester: 5,
+    month: "June 2026",
+    attendancePercentage: 78,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    attendanceId: "att_s5_june",
+    studentId: "s5",
+    studentName: "Midhun Mohan",
+    department: "electronics",
+    semester: 1,
+    month: "June 2026",
+    attendancePercentage: 64,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+export const mockComplaints: Complaint[] = [
+  {
+    complaintId: "comp_001",
+    name: "Adithya Sunil",
+    phoneNumber: "9876543201",
+    email: "adithya.ct5@gptckaduthuruthy.ac.in",
+    department: "computer",
+    semester: 5,
+    category: "Infrastructure",
+    title: "Projector not working in S5 classroom",
+    description: "The projector in our S5 Computer Engineering classroom has been blinking and flickering for the last two weeks, making it hard to follow the slides during lectures. Please look into it.",
+    isAnonymous: false,
+    status: "Pending",
+    adminRemarks: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    complaintId: "comp_002",
+    name: "Anjali Krishna",
+    phoneNumber: "9876543202",
+    email: "anjali.ct5@gptckaduthuruthy.ac.in",
+    department: "computer",
+    semester: 5,
+    category: "Laboratory Issues",
+    title: "Insufficient VLSI lab kits",
+    description: "During lab hours, 3 students have to share a single VLSI kit. This leaves very little hands-on practice time for each student. Kindly procure more kits if possible.",
+    isAnonymous: true,
+    status: "Under Review",
+    adminRemarks: "Under investigation by the department.",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];

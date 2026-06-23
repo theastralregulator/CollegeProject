@@ -9,7 +9,7 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth, db, handleFirestoreError, OperationType } from "./firebase";
 import { seedAllCollections } from "./dataSeed";
 import { 
-  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, CollegeInformation 
+  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, CollegeInformation, AttendanceRecord, Complaint 
 } from "./types";
 
 // Component imports
@@ -19,6 +19,8 @@ import NoticeCard from "./components/NoticeCard";
 import AiAssistant from "./components/AiAssistant";
 import AdminPanel from "./components/AdminPanel";
 import DepartmentView from "./components/DepartmentView";
+import AttendanceView from "./components/AttendanceView";
+import ComplaintView from "./components/ComplaintView";
 import { 
   AboutView, TeachersView, StudentsView, BloodBankView, AcademicCenter,
   FacilitiesView, PlacementView, ContactView
@@ -29,7 +31,7 @@ import {
   Sparkles, Search, Mic, ArrowRight, BookOpen, FileText, ClipboardList, 
   Droplet, RefreshCw, Layers, Shield, Volume2, HelpCircle, 
   GraduationCap, Download, ChevronRight, X, Heart, Building2, MapPin, Mail, Phone, Users,
-  Briefcase, PhoneCall
+  Briefcase, PhoneCall, Clock, MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 // @ts-ignore
@@ -96,8 +98,10 @@ export default function App() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [donors, setDonors] = useState<BloodDonor[]>([]);
   const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [collegeInfo, setCollegeInfo] = useState<CollegeInformation[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -107,9 +111,12 @@ export default function App() {
 
   // Trigger seeding and load Firestore observers
   useEffect(() => {
-    // 1. Boot up seeding
-    seedAllCollections().then(() => {
-      // 2. Load Firestore reactive listeners
+    let active = true;
+    const unsubscribes: (() => void)[] = [];
+
+    const registerListeners = () => {
+      if (!active) return;
+
       const unsubNotices = onSnapshot(collection(db, "notices"), (snap) => {
         const list: Notice[] = [];
         snap.forEach(d => list.push(d.data() as Notice));
@@ -119,6 +126,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "notices");
       });
+      unsubscribes.push(unsubNotices);
 
       const unsubDepts = onSnapshot(collection(db, "departments"), (snap) => {
         const list: Department[] = [];
@@ -127,6 +135,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "departments");
       });
+      unsubscribes.push(unsubDepts);
 
       const unsubTeachers = onSnapshot(collection(db, "faculty"), (snap) => {
         const list: Teacher[] = [];
@@ -135,6 +144,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "faculty");
       });
+      unsubscribes.push(unsubTeachers);
 
       const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
         const list: Student[] = [];
@@ -143,6 +153,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "students");
       });
+      unsubscribes.push(unsubStudents);
 
       const unsubNotes = onSnapshot(collection(db, "notes"), (snap) => {
         const list: Note[] = [];
@@ -151,6 +162,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "notes");
       });
+      unsubscribes.push(unsubNotes);
 
       const unsubQPs = onSnapshot(collection(db, "questionPapers"), (snap) => {
         const list: QuestionPaper[] = [];
@@ -159,6 +171,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "questionPapers");
       });
+      unsubscribes.push(unsubQPs);
 
       const unsubAssigns = onSnapshot(collection(db, "assignments"), (snap) => {
         const list: Assignment[] = [];
@@ -167,6 +180,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "assignments");
       });
+      unsubscribes.push(unsubAssigns);
 
       const unsubDonors = onSnapshot(collection(db, "bloodBank"), (snap) => {
         const list: BloodDonor[] = [];
@@ -175,6 +189,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "bloodBank");
       });
+      unsubscribes.push(unsubDonors);
 
       const unsubRequests = onSnapshot(collection(db, "studentRequests"), (snap) => {
         const list: StudentRequest[] = [];
@@ -183,6 +198,7 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "studentRequests");
       });
+      unsubscribes.push(unsubRequests);
 
       const unsubCollegeInfo = onSnapshot(collection(db, "collegeInformation"), (snap) => {
         const list: CollegeInformation[] = [];
@@ -191,6 +207,25 @@ export default function App() {
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "collegeInformation");
       });
+      unsubscribes.push(unsubCollegeInfo);
+
+      const unsubAttendance = onSnapshot(collection(db, "attendance"), (snap) => {
+        const list: AttendanceRecord[] = [];
+        snap.forEach(d => list.push(d.data() as AttendanceRecord));
+        setAttendance(list);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, "attendance");
+      });
+      unsubscribes.push(unsubAttendance);
+
+      const unsubComplaints = onSnapshot(collection(db, "complaints"), (snap) => {
+        const list: Complaint[] = [];
+        snap.forEach(d => list.push(d.data() as Complaint));
+        setComplaints(list);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, "complaints");
+      });
+      unsubscribes.push(unsubComplaints);
 
       const unsubCategories = onSnapshot(collection(db, "noticeCategories"), (snap) => {
         const list: { id: string; name: string }[] = [];
@@ -199,22 +234,19 @@ export default function App() {
         setLoading(false);
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, "noticeCategories");
+        setLoading(false);
       });
+      unsubscribes.push(unsubCategories);
+    };
 
-      return () => {
-        unsubNotices();
-        unsubDepts();
-        unsubTeachers();
-        unsubStudents();
-        unsubNotes();
-        unsubQPs();
-        unsubAssigns();
-        unsubDonors();
-        unsubRequests();
-        unsubCollegeInfo();
-        unsubCategories();
-      };
-    });
+    // 1. Run seeding
+    seedAllCollections()
+      .catch((err) => {
+        console.error("Firebase Database seeding failed:", err);
+      })
+      .finally(() => {
+        registerListeners();
+      });
 
     // Check pre-existing auth session
     const savedAdminEmail = localStorage.getItem("campusai_admin_email");
@@ -237,6 +269,8 @@ export default function App() {
     });
 
     return () => {
+      active = false;
+      unsubscribes.forEach(unsub => unsub());
       unsubAuth();
     };
   }, []);
@@ -409,6 +443,7 @@ export default function App() {
                         <button onClick={() => handleQuickQuizTrigger("Show latest notices")} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 text-slate-600 rounded-full border border-slate-100 transition whitespace-nowrap">Show notices</button>
                         <button onClick={() => handleQuickQuizTrigger("Find O+ blood donors")} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 text-slate-600 rounded-full border border-slate-100 transition whitespace-nowrap">O+ Blood</button>
                         <button onClick={() => handleQuickQuizTrigger("Show assignments s5")} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 text-slate-600 rounded-full border border-slate-100 transition whitespace-nowrap">S5 Homework</button>
+                        <button onClick={() => handleQuickQuizTrigger("How to submit a complaint?")} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 hover:text-blue-600 text-slate-600 rounded-full border border-slate-100 transition whitespace-nowrap">File Complaint</button>
                       </div>
                     </div>
                   </div>
@@ -418,12 +453,13 @@ export default function App() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-extrabold text-slate-405 pl-1 uppercase tracking-widest">Active Archives Quick access</h3>
                   
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
                     {[
                       { id: "notes", title: "Syllabus Notes", subtitle: "Branch PDFs & texts", icon: BookOpen, color: "bg-blue-500", text: "text-blue-600", action: () => handleDeepAcademicNavigation("notes") },
                       { id: "papers", title: "Question Papers", subtitle: "Previous series", icon: FileText, color: "bg-indigo-500", text: "text-indigo-600", action: () => handleDeepAcademicNavigation("papers") },
                       { id: "assignments", title: "Active Assignments", subtitle: "Homework tracker", icon: ClipboardList, color: "bg-emerald-500", text: "text-emerald-600", action: () => handleDeepAcademicNavigation("assignments") },
                       { id: "bloodbank", title: "Blood Bank", subtitle: "Emergency donors", icon: Droplet, color: "bg-red-500", text: "text-red-600", action: () => handleQuickAccessNavigation("bloodbank") },
+                      { id: "complaints", title: "Complaint Box", subtitle: "Submit feedback", icon: MessageSquare, color: "bg-purple-500", text: "text-purple-600", action: () => handleQuickAccessNavigation("complaints") },
                     ].map((card, idx) => {
                       const Icon = card.icon;
                       return (
@@ -563,6 +599,7 @@ export default function App() {
                   faculty={teachers}
                   questionPapers={questionPapers}
                   collegeInformation={collegeInfo}
+                  attendance={attendance}
                 />
               </motion.div>
             )}
@@ -588,6 +625,23 @@ export default function App() {
             )}
 
             {/* ==========================================
+                4.5 TAB: ATTENDANCE DETAILS
+                ========================================== */}
+            {activeTab === "attendance" && (
+              <motion.div
+                key="attendance"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <AttendanceView 
+                  attendance={attendance}
+                  departments={departments}
+                />
+              </motion.div>
+            )}
+
+            {/* ==========================================
                 5. TAB: MORE FEATURES
                 ========================================== */}
             {activeTab === "more" && (
@@ -605,6 +659,8 @@ export default function App() {
                     { id: "teachers", label: "Teachers", icon: Users },
                     { id: "students", label: "Students", icon: GraduationCap },
                     { id: "bloodbank", label: "Blood Bank", icon: Droplet },
+                    { id: "attendance", label: "Attendance", icon: Clock },
+                    { id: "complaints", label: "Complaint Box", icon: MessageSquare },
                     { id: "facilities", label: "Facilities", icon: Layers },
                     { id: "placement", label: "Placement", icon: Briefcase },
                     { id: "contact", label: "Contact", icon: PhoneCall },
@@ -634,6 +690,8 @@ export default function App() {
                   {activeMoreSubTab === "teachers" && <TeachersView teachers={teachers} departments={departments} />}
                   {activeMoreSubTab === "students" && <StudentsView students={students} departments={departments} studentRequests={studentRequests} />}
                   {activeMoreSubTab === "bloodbank" && <BloodBankView donors={donors} />}
+                  {activeMoreSubTab === "attendance" && <AttendanceView attendance={attendance} departments={departments} />}
+                  {activeMoreSubTab === "complaints" && <ComplaintView departments={departments} />}
                   {activeMoreSubTab === "facilities" && <FacilitiesView />}
                   {activeMoreSubTab === "placement" && <PlacementView />}
                   {activeMoreSubTab === "contact" && <ContactView />}
@@ -670,6 +728,8 @@ export default function App() {
                   donors={donors}
                   departments={departments}
                   studentRequests={studentRequests}
+                  attendance={attendance}
+                  complaints={complaints}
                   noticeCategories={categories}
                   onRefreshData={() => {
                     // Reactive snapshot automatically syncing, but we trigger a log confirm.

@@ -18,12 +18,12 @@ import {
 } from "firebase/firestore";
 import { auth, db, handleFirestoreError, OperationType } from "../firebase";
 import { 
-  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest 
+  Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, AttendanceRecord, Complaint 
 } from "../types";
 import { 
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
-  Search, Eye, X, Check, Filter
+  Search, Eye, X, Check, Filter, Clock, MessageSquare
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -36,6 +36,8 @@ interface AdminPanelProps {
   donors: BloodDonor[];
   departments: Department[];
   studentRequests: StudentRequest[];
+  attendance: AttendanceRecord[];
+  complaints?: Complaint[];
   noticeCategories: { id: string; name: string }[];
   onRefreshData: () => void;
   onLoginSuccess: (user: User) => void;
@@ -52,6 +54,8 @@ export default function AdminPanel({
   donors,
   departments,
   studentRequests = [],
+  attendance = [],
+  complaints = [],
   noticeCategories = [],
   onRefreshData,
   onLoginSuccess,
@@ -68,7 +72,7 @@ export default function AdminPanel({
   const [customCategory, setCustomCategory] = useState("");
 
   // Active Admin Submenu
-  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests">("dashboard");
+  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints">("dashboard");
 
   // Form states for adding items
   const [newNotice, setNewNotice] = useState({ title: "", content: "", category: "academic", departmentId: "general" });
@@ -78,6 +82,32 @@ export default function AdminPanel({
   const [newQP, setNewQP] = useState({ title: "", subject: "", departmentId: "computer", semester: 5, year: "2026", fileName: "paper-2026.pdf", fileUrl: "" });
   const [newAssignment, setNewAssignment] = useState({ title: "", subject: "", departmentId: "computer", semester: 5, dueDate: "2026-07-15", description: "", fileName: "assignment.pdf", fileUrl: "" });
   const [newDonor, setNewDonor] = useState({ name: "", bloodGroup: "O+", departmentId: "computer", semester: 5, place: "", phone: "", isAvailable: true });
+  
+  // Attendance Management States
+  const [newAttendance, setNewAttendance] = useState({
+    studentId: "",
+    studentName: "",
+    department: "computer",
+    semester: 5,
+    month: "June 2026",
+    attendancePercentage: 85
+  });
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
+  const [bulkAttendancePercent, setBulkAttendancePercent] = useState(85);
+  const [bulkAttendanceMonth, setBulkAttendanceMonth] = useState("June 2026");
+  const [selectedBulkStudents, setSelectedBulkStudents] = useState<string[]>([]);
+  const [attendanceSearchQuery, setAttendanceSearchQuery] = useState("");
+  const [attendanceDeptFilter, setAttendanceDeptFilter] = useState("all");
+  const [attendanceSemFilter, setAttendanceSemFilter] = useState("all");
+
+  // Complaint Management States
+  const [complaintSearchQuery, setComplaintSearchQuery] = useState("");
+  const [complaintStatusFilter, setComplaintStatusFilter] = useState("All");
+  const [complaintCategoryFilter, setComplaintCategoryFilter] = useState("All");
+  const [complaintDeptFilter, setComplaintDeptFilter] = useState("All");
+  const [complaintSemFilter, setComplaintSemFilter] = useState("All");
+  const [selectedComplaintDetail, setSelectedComplaintDetail] = useState<Complaint | null>(null);
+  const [complaintRemarksInput, setComplaintRemarksInput] = useState("");
 
   // Delete confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState<{ collection: string; id: string; label?: string } | null>(null);
@@ -95,6 +125,14 @@ export default function AdminPanel({
       setAdminRemarksInput("");
     }
   }, [selectedRequestDetail?.id]);
+
+  useEffect(() => {
+    if (selectedComplaintDetail) {
+      setComplaintRemarksInput(selectedComplaintDetail.adminRemarks || "");
+    } else {
+      setComplaintRemarksInput("");
+    }
+  }, [selectedComplaintDetail?.complaintId]);
 
   useEffect(() => {
     const savedAdminEmail = localStorage.getItem("campusai_admin_email");
@@ -247,6 +285,178 @@ export default function AdminPanel({
     }
   };
 
+  // Attendance Handlers
+  const handleAddAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!newAttendance.studentId) {
+        setAuthError("Please select a student first.");
+        return;
+      }
+      const student = students.find(s => s.id === newAttendance.studentId);
+      if (!student) {
+        setAuthError("Selected student not found.");
+        return;
+      }
+      const docId = "att_" + student.id + "_" + newAttendance.month.toLowerCase().replace(/\s+/g, "_");
+      const record = {
+        attendanceId: docId,
+        studentId: student.id,
+        studentName: student.name,
+        department: student.departmentId,
+        semester: student.semester,
+        month: newAttendance.month,
+        attendancePercentage: Number(newAttendance.attendancePercentage),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, "attendance", docId), record);
+      setNewAttendance({ studentId: "", studentName: "", department: "computer", semester: 5, month: "June 2026", attendancePercentage: 85 });
+      setInfoMessage("✅ Attendance record added successfully.");
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to add attendance record: " + err.message);
+    }
+  };
+
+  const handleSaveEditAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAttendance) return;
+    try {
+      await updateDoc(doc(db, "attendance", editingAttendance.attendanceId), {
+        attendancePercentage: Number(editingAttendance.attendancePercentage),
+        updatedAt: new Date().toISOString()
+      });
+      setEditingAttendance(null);
+      setInfoMessage("✅ Attendance record updated successfully.");
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to edit attendance record: " + err.message);
+    }
+  };
+
+  const handleBulkUpdateAttendance = async () => {
+    if (selectedBulkStudents.length === 0) {
+      setAuthError("Please select at least one student for bulk update.");
+      return;
+    }
+    try {
+      let successCount = 0;
+      for (const sId of selectedBulkStudents) {
+        const student = students.find(s => s.id === sId);
+        if (!student) continue;
+        const docId = "att_" + student.id + "_" + bulkAttendanceMonth.toLowerCase().replace(/\s+/g, "_");
+        const record = {
+          attendanceId: docId,
+          studentId: student.id,
+          studentName: student.name,
+          department: student.departmentId,
+          semester: student.semester,
+          month: bulkAttendanceMonth,
+          attendancePercentage: Number(bulkAttendancePercent),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, "attendance", docId), record);
+        successCount++;
+      }
+      setSelectedBulkStudents([]);
+      setInfoMessage(`✅ Successfully bulk updated ${successCount} student attendance records for ${bulkAttendanceMonth}.`);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError("Failed to bulk update attendance: " + err.message);
+    }
+  };
+
+  // Calculate attendance averages per student
+  const studentAverages = React.useMemo(() => {
+    const studentMap: { [id: string]: { name: string; sum: number; count: number } } = {};
+    attendance.forEach(r => {
+      const key = r.studentName;
+      if (!studentMap[key]) {
+        studentMap[key] = { name: r.studentName, sum: 0, count: 0 };
+      }
+      studentMap[key].sum += r.attendancePercentage;
+      studentMap[key].count += 1;
+    });
+    return Object.values(studentMap).map(s => ({
+      name: s.name,
+      avg: Math.round(s.sum / s.count)
+    }));
+  }, [attendance]);
+
+  const avgAttendance = React.useMemo(() => {
+    if (attendance.length === 0) return 0;
+    const sum = attendance.reduce((acc, r) => acc + r.attendancePercentage, 0);
+    return Math.round(sum / attendance.length);
+  }, [attendance]);
+
+  const above90Count = React.useMemo(() => {
+    return studentAverages.filter(s => s.avg >= 90).length;
+  }, [studentAverages]);
+
+  const below75Count = React.useMemo(() => {
+    return studentAverages.filter(s => s.avg < 75).length;
+  }, [studentAverages]);
+
+  const shortageAlertsCount = React.useMemo(() => {
+    return attendance.filter(r => r.attendancePercentage < 75).length;
+  }, [attendance]);
+
+  const totalComplaintsCount = React.useMemo(() => complaints.length, [complaints]);
+  const pendingComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Pending").length, [complaints]);
+  const underReviewComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Under Review").length, [complaints]);
+  const resolvedComplaintsCount = React.useMemo(() => complaints.filter(c => c.status === "Resolved").length, [complaints]);
+
+  const handleUpdateComplaintStatus = async (complaintId: string, nextStatus: "Pending" | "Under Review" | "Resolved" | "Rejected") => {
+    try {
+      const nowISO = new Date().toISOString();
+      const ref = doc(db, "complaints", complaintId);
+      await updateDoc(ref, {
+        status: nextStatus,
+        adminRemarks: complaintRemarksInput.trim(),
+        updatedAt: nowISO
+      });
+      
+      if (selectedComplaintDetail && selectedComplaintDetail.complaintId === complaintId) {
+        setSelectedComplaintDetail(prev => prev ? {
+          ...prev,
+          status: nextStatus,
+          adminRemarks: complaintRemarksInput.trim(),
+          updatedAt: nowISO
+        } : null);
+      }
+      
+      setInfoMessage(`✅ Complaint status updated to ${nextStatus}.`);
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError(`Failed to update complaint status: ${err.message}`);
+    }
+  };
+
+  const handleSaveComplaintRemarks = async (complaintId: string) => {
+    try {
+      const ref = doc(db, "complaints", complaintId);
+      await updateDoc(ref, {
+        adminRemarks: complaintRemarksInput.trim(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      if (selectedComplaintDetail && selectedComplaintDetail.complaintId === complaintId) {
+        setSelectedComplaintDetail(prev => prev ? {
+          ...prev,
+          adminRemarks: complaintRemarksInput.trim(),
+          updatedAt: new Date().toISOString()
+        } : null);
+      }
+      
+      setInfoMessage("✅ Admin remarks updated successfully.");
+      onRefreshData();
+    } catch (err: any) {
+      setAuthError(`Failed to save complaint remarks: ${err.message}`);
+    }
+  };
+
   if (!user) {
     return (
       <div className="mx-auto max-w-lg rounded-3xl border border-slate-100 bg-white p-8 shadow-md">
@@ -385,11 +595,13 @@ export default function AdminPanel({
             { id: "notices", label: "Manage Notices", icon: Bell },
             { id: "teachers", label: "Manage Faculty", icon: Users },
             { id: "students", label: "Manage Students", icon: GraduationCap },
+            { id: "attendance", label: "Manage Attendance", icon: Clock },
             { id: "notes", label: "Manage Notes", icon: BookOpen },
             { id: "assignments", label: "Assignments", icon: ClipboardList },
             { id: "qpapers", label: "Question Papers", icon: FileText },
             { id: "bloodbank", label: "Blood Donors", icon: Droplet },
             { id: "requests", label: "Student Requests", icon: ClipboardCheck },
+            { id: "complaints", label: "Complaints", icon: MessageSquare },
           ].map((sub) => {
             const Icon = sub.icon;
             const isSubActive = activeSubTab === sub.id;
@@ -444,6 +656,60 @@ export default function AdminPanel({
                 const Icon = card.icon;
                 return (
                   <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Attendance Analytics Dashboard Row */}
+            <h4 className="text-sm font-extrabold text-slate-800 mt-6">Attendance Metrics Overview</h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                { label: "Average Attendance", count: `${avgAttendance}%`, color: "from-blue-600 to-indigo-500", icon: Clock },
+                { label: "Students Above 90%", count: above90Count, color: "from-emerald-600 to-teal-500", icon: GraduationCap },
+                { label: "Students Below 75%", count: below75Count, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                { label: "Attendance Alerts", count: `${shortageAlertsCount} shortage`, color: "from-rose-600 to-pink-500", icon: AlertCircle, badge: "Shortage" }
+              ].map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                    {card.badge && (
+                      <span className="absolute top-2 right-2 bg-red-100 text-red-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                        {card.badge}
+                      </span>
+                    )}
+                    <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Complaints Analytics Dashboard Row */}
+            <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+              {[
+                { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
+                { label: "Pending Issues", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
+                { label: "Under Review", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
+                { label: "Resolved Cases", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle }
+              ].map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                    {card.badge && (
+                      <span className="absolute top-2 right-2 bg-amber-100 text-amber-850 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                        {card.badge}
+                      </span>
+                    )}
                     <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
                       <Icon className="h-5 w-5" />
                     </div>
@@ -1712,6 +1978,820 @@ export default function AdminPanel({
                               className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-[10px] font-extrabold uppercase text-white transition"
                             >
                               Approve
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* 10. Attendance Management Sub-Tab */}
+        {activeSubTab === "attendance" && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Stats Summary cards */}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                <div className="mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xl font-extrabold text-slate-800 tracking-tight">{avgAttendance}%</p>
+                <p className="mt-1 text-[9px] font-bold text-slate-400 uppercase leading-snug">Average Attendance</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                <div className="mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xl font-extrabold text-slate-800 tracking-tight">{above90Count}</p>
+                <p className="mt-1 text-[9px] font-bold text-slate-400 uppercase leading-snug">Above 90% (Excellent)</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                <div className="mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xl font-extrabold text-slate-800 tracking-tight">{below75Count}</p>
+                <p className="mt-1 text-[9px] font-bold text-slate-400 uppercase leading-snug">Below 75% (Shortage)</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                <div className="mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xl font-extrabold text-rose-800 tracking-tight">{shortageAlertsCount}</p>
+                <p className="mt-1 text-[9px] font-bold text-slate-400 uppercase leading-snug">Shortage Alerts</p>
+              </div>
+            </div>
+
+            {/* Grid for Add Attendance & Bulk Update */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Form: Add Individual Attendance */}
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3">Add Student Attendance</h3>
+                
+                <form onSubmit={handleAddAttendance} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500">Select Student</label>
+                    <select
+                      value={newAttendance.studentId}
+                      onChange={(e) => {
+                        const student = students.find(s => s.id === e.target.value);
+                        if (student) {
+                          setNewAttendance({
+                            ...newAttendance,
+                            studentId: student.id,
+                            studentName: student.name,
+                            department: student.departmentId,
+                            semester: student.semester
+                          });
+                        } else {
+                          setNewAttendance({ ...newAttendance, studentId: "", studentName: "" });
+                        }
+                      }}
+                      required
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500 bg-white cursor-pointer"
+                    >
+                      <option value="">-- Choose Student --</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} (ADM: {s.admissionNumber}) · S{s.semester}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Month / Year</label>
+                      <select
+                        value={newAttendance.month}
+                        onChange={(e) => setNewAttendance({ ...newAttendance, month: e.target.value })}
+                        required
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500 bg-white cursor-pointer"
+                      >
+                        {["June 2026", "July 2026", "August 2026", "September 2026", "October 2026", "November 2026", "December 2026"].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Attendance Percentage (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={newAttendance.attendancePercentage}
+                        onChange={(e) => setNewAttendance({ ...newAttendance, attendancePercentage: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                        required
+                        placeholder="e.g. 85"
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {newAttendance.studentName && (
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-[10px] font-bold text-slate-500 space-y-1">
+                      <p>Name: <span className="text-slate-800">{newAttendance.studentName}</span></p>
+                      <p>Department: <span className="text-slate-800">{departments.find(d => d.id === newAttendance.department)?.name || newAttendance.department}</span></p>
+                      <p>Semester: <span className="text-slate-800">Semester {newAttendance.semester}</span></p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full rounded-xl bg-blue-650 hover:bg-blue-700 text-white py-2.5 text-xs font-bold transition shadow-sm uppercase tracking-wider"
+                  >
+                    Add Record
+                  </button>
+                </form>
+              </div>
+
+              {/* Bulk Update Tool */}
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3">Bulk Attendance Update</h3>
+                
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Month / Year</label>
+                      <select
+                        value={bulkAttendanceMonth}
+                        onChange={(e) => setBulkAttendanceMonth(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 outline-none bg-white cursor-pointer"
+                      >
+                        {["June 2026", "July 2026", "August 2026", "September 2026", "October 2026", "November 2026", "December 2026"].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Attendance Percentage (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={bulkAttendancePercent}
+                        onChange={(e) => setBulkAttendancePercent(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        placeholder="e.g. 85"
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-800 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 flex justify-between items-center">
+                      <span>Select Students ({selectedBulkStudents.length} selected)</span>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (selectedBulkStudents.length === students.length) {
+                            setSelectedBulkStudents([]);
+                          } else {
+                            setSelectedBulkStudents(students.map(s => s.id));
+                          }
+                        }}
+                        className="text-blue-600 hover:underline text-[10px] uppercase font-bold"
+                      >
+                        {selectedBulkStudents.length === students.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </label>
+                    
+                    <div className="mt-2 border border-slate-100 rounded-2xl max-h-36 overflow-y-auto p-3 bg-slate-50/50 space-y-1.5">
+                      {students.map(s => (
+                        <label key={s.id} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={selectedBulkStudents.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBulkStudents([...selectedBulkStudents, s.id]);
+                              } else {
+                                setSelectedBulkStudents(selectedBulkStudents.filter(id => id !== s.id));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span>{s.name} (S{s.semester} · {departments.find(d => d.id === s.departmentId)?.code})</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkUpdateAttendance}
+                    className="w-full rounded-xl bg-slate-900 hover:bg-slate-850 text-white py-2.5 text-xs font-bold transition shadow-sm uppercase tracking-wider"
+                  >
+                    Apply Bulk Update
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Reports and Database view */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div>
+                  <h3 className="text-md font-bold text-slate-800">Attendance Database</h3>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Filter, search, edit and delete student attendance logs.</p>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search student..."
+                      value={attendanceSearchQuery}
+                      onChange={(e) => setAttendanceSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 outline-none w-44 focus:bg-white focus:w-56 transition-all"
+                    />
+                  </div>
+
+                  <select
+                    value={attendanceDeptFilter}
+                    onChange={(e) => setAttendanceDeptFilter(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold bg-white outline-none cursor-pointer"
+                  >
+                    <option value="all">All Depts</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.code}</option>)}
+                  </select>
+
+                  <select
+                    value={attendanceSemFilter}
+                    onChange={(e) => setAttendanceSemFilter(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold bg-white outline-none cursor-pointer"
+                  >
+                    <option value="all">All Sems</option>
+                    {[1,2,3,4,5,6].map(s => <option key={s} value={s.toString()}>S{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Records List Table */}
+              <div className="overflow-x-auto">
+                {(() => {
+                  const filtered = attendance.filter(rec => {
+                    const q = attendanceSearchQuery.toLowerCase().trim();
+                    const matchesSearch = rec.studentName.toLowerCase().includes(q) || 
+                                          (rec.studentId && rec.studentId.toLowerCase().includes(q));
+                    const matchesDept = attendanceDeptFilter === "all" || rec.department === attendanceDeptFilter;
+                    const matchesSem = attendanceSemFilter === "all" || rec.semester.toString() === attendanceSemFilter;
+                    return matchesSearch && matchesDept && matchesSem;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-xs text-center text-slate-400 font-semibold py-8">No matching attendance records found.</p>
+                    );
+                  }
+
+                  return (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-slate-400 font-extrabold uppercase tracking-wider">
+                          <th className="pb-3 pl-2">Student Name</th>
+                          <th className="pb-3">Department</th>
+                          <th className="pb-3">Semester</th>
+                          <th className="pb-3">Month</th>
+                          <th className="pb-3">Percentage</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3 text-right pr-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                        {filtered.map(rec => {
+                          const shortage = rec.attendancePercentage < 75;
+                          return (
+                            <tr key={rec.attendanceId} className="hover:bg-slate-50/50 transition">
+                              <td className="py-3 pl-2 font-bold text-slate-800">{rec.studentName}</td>
+                              <td className="py-3 uppercase">{departments.find(d => d.id === rec.department)?.code || rec.department}</td>
+                              <td className="py-3">Semester {rec.semester}</td>
+                              <td className="py-3">{rec.month}</td>
+                              <td className="py-3">
+                                <span className={`px-2 py-0.5 rounded-lg border font-bold ${
+                                  rec.attendancePercentage >= 90 ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
+                                  rec.attendancePercentage >= 75 ? "bg-amber-50 border-amber-100 text-amber-700" :
+                                  "bg-rose-50 border-rose-100 text-rose-700"
+                                }`}>
+                                  {rec.attendancePercentage}%
+                                </span>
+                              </td>
+                              <td className="py-3">
+                                {shortage ? (
+                                  <span className="bg-red-50 border border-red-100 text-red-700 px-2 py-0.5 rounded-lg text-[9px] uppercase font-black">
+                                    Shortage
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400">Regular</span>
+                                )}
+                              </td>
+                              <td className="py-3 text-right pr-2">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => setEditingAttendance(rec)}
+                                    className="p-1.5 rounded-lg bg-slate-50 hover:bg-indigo-50 hover:text-indigo-650 transition text-slate-500"
+                                    title="Edit"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteItem("attendance", rec.attendanceId, `${rec.studentName} (${rec.month})`)}
+                                    className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 hover:text-rose-600 transition text-slate-500"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Reports generation panel */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6">
+              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3">Generate Attendance Reports</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Department averages report */}
+                <div className="border border-slate-100 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Department-wise Averages</h4>
+                  <div className="space-y-3">
+                    {departments.map(dept => {
+                      const records = attendance.filter(r => r.department === dept.id);
+                      const avg = records.length > 0 ? Math.round(records.reduce((sum, r) => sum + r.attendancePercentage, 0) / records.length) : 0;
+                      return (
+                        <div key={dept.id} className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-700">{dept.name} ({dept.code})</span>
+                          <span className={`font-black px-2.5 py-1 rounded-lg border ${
+                            avg >= 90 ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
+                            avg >= 75 ? "bg-amber-50 border-amber-100 text-amber-700" :
+                            "bg-rose-50 border-rose-100 text-rose-700"
+                          }`}>{avg > 0 ? `${avg}%` : "No Records"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Semester averages report */}
+                <div className="border border-slate-100 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Semester-wise Averages</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[1, 2, 3, 4, 5, 6].map(sem => {
+                      const records = attendance.filter(r => r.semester === sem);
+                      const avg = records.length > 0 ? Math.round(records.reduce((sum, r) => sum + r.attendancePercentage, 0) / records.length) : 0;
+                      return (
+                        <div key={sem} className="flex justify-between items-center text-xs p-2.5 bg-slate-50 rounded-xl">
+                          <span className="font-bold text-slate-600">S{sem}</span>
+                          <span className="font-black text-slate-800">{avg > 0 ? `${avg}%` : "N/A"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Low Attendance students shortage list */}
+                <div className="border border-slate-100 rounded-2xl p-5 space-y-4 md:col-span-2">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Low Attendance Students Report (&lt;75% average)</span>
+                    <span className="bg-rose-50 border border-rose-100 text-rose-700 font-extrabold text-[9px] px-2.5 py-0.5 rounded-lg uppercase">
+                      Shortage Shortlist
+                    </span>
+                  </h4>
+                  
+                  {(() => {
+                    const lowStudents = studentAverages.filter(s => s.avg < 75);
+                    if (lowStudents.length === 0) {
+                      return (
+                        <p className="text-xs text-slate-400 font-semibold text-center py-4">No students currently in attendance shortage! Great work.</p>
+                      );
+                    }
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-50 text-slate-400 font-extrabold uppercase">
+                              <th className="pb-2">Student Name</th>
+                              <th className="pb-2">Average Attendance</th>
+                              <th className="pb-2">Guardian Contact</th>
+                              <th className="pb-2 text-right">Emergency Phone</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                            {lowStudents.map(s => {
+                              const studInfo = students.find(std => std.name === s.name);
+                              return (
+                                <tr key={s.name}>
+                                  <td className="py-2.5 font-bold text-slate-800">{s.name}</td>
+                                  <td className="py-2.5 text-rose-600 font-black">{s.avg}%</td>
+                                  <td className="py-2.5 text-slate-550">{studInfo?.parentName || "N/A"}</td>
+                                  <td className="py-2.5 text-right font-mono text-slate-800">{studInfo?.parentPhone || studInfo?.phone || "N/A"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Editing attendance popup modal */}
+            {editingAttendance && (
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setEditingAttendance(null)} />
+                
+                <div className="relative max-w-md w-full rounded-3xl border border-slate-100 bg-white p-6 shadow-xl z-10 space-y-4">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h4 className="text-sm font-bold text-slate-800">Edit Student Attendance</h4>
+                    <button onClick={() => setEditingAttendance(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveEditAttendance} className="space-y-4">
+                    <div className="text-xs font-semibold text-slate-500 space-y-1 p-3 bg-slate-50 rounded-2xl">
+                      <p>Student: <span className="text-slate-800 font-bold">{editingAttendance.studentName}</span></p>
+                      <p>Month: <span className="text-slate-800 font-bold">{editingAttendance.month}</span></p>
+                      <p>Department: <span className="text-slate-800 font-bold">{departments.find(d => d.id === editingAttendance.department)?.code || editingAttendance.department}</span></p>
+                      <p>Semester: <span className="text-slate-800 font-bold">Semester {editingAttendance.semester}</span></p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500">Attendance Percentage (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editingAttendance.attendancePercentage}
+                        onChange={(e) => setEditingAttendance({ ...editingAttendance, attendancePercentage: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                        required
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-850 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-2 text-xs font-bold font-sans">
+                      <button
+                        type="button"
+                        onClick={() => setEditingAttendance(null)}
+                        className="rounded-xl px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 transition uppercase"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-blue-650 hover:bg-blue-700 text-white px-4 py-2 transition uppercase"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 11. Complaint Box / Grievance Redressal Sub-Tab */}
+        {activeSubTab === "complaints" && (
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 space-y-6 animate-fade-in font-sans text-xs">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 pb-4 gap-2">
+              <div>
+                <h3 className="text-md font-bold text-slate-800 font-sans text-sm">Complaint Box & Grievances</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">Track, review, categorize, and resolve student grievances and institutional feedback.</p>
+              </div>
+              <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-[10px] tracking-wider uppercase px-3 py-1 rounded-full shrink-0">
+                Total Complaints: {complaints.length}
+              </span>
+            </div>
+
+            {/* Filters Section */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by title, details or student name..."
+                  value={complaintSearchQuery}
+                  onChange={(e) => setComplaintSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 bg-slate-50 outline-none focus:bg-white focus:border-indigo-500 transition"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer">
+                <Filter className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Status:</span>
+                <select
+                  value={complaintStatusFilter}
+                  onChange={(e) => setComplaintStatusFilter(e.target.value)}
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Under Review">Under Review</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer">
+                <Filter className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Category:</span>
+                <select
+                  value={complaintCategoryFilter}
+                  onChange={(e) => setComplaintCategoryFilter(e.target.value)}
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer max-w-[150px]"
+                >
+                  <option value="All">All Categories</option>
+                  {[
+                    "Academic Issues",
+                    "Faculty Related",
+                    "Laboratory Issues",
+                    "Infrastructure",
+                    "Library",
+                    "Examination",
+                    "Attendance",
+                    "Placement",
+                    "Ragging Complaint",
+                    "Suggestion",
+                    "Other"
+                  ].map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+
+              {/* Department Filter */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer">
+                <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Dept:</span>
+                <select
+                  value={complaintDeptFilter}
+                  onChange={(e) => setComplaintDeptFilter(e.target.value)}
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="All">All Depts</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.code}</option>)}
+                </select>
+              </div>
+
+              {/* Semester Filter */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 cursor-pointer">
+                <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Sem:</span>
+                <select
+                  value={complaintSemFilter}
+                  onChange={(e) => setComplaintSemFilter(e.target.value)}
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                >
+                  <option value="All">All Sems</option>
+                  {[1,2,3,4,5,6].map(s => <option key={s} value={s.toString()}>S{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* List representation */}
+            {(() => {
+              const filteredComplaints = complaints.filter((comp) => {
+                const q = complaintSearchQuery.toLowerCase().trim();
+                const nameMatch = !comp.isAnonymous && comp.name?.toLowerCase().includes(q);
+                const titleMatch = comp.title?.toLowerCase().includes(q);
+                const descMatch = comp.description?.toLowerCase().includes(q);
+                const catMatch = comp.category?.toLowerCase().includes(q);
+                const matchesSearch = !q || nameMatch || titleMatch || descMatch || catMatch;
+
+                const matchesStatus = complaintStatusFilter === "All" || comp.status === complaintStatusFilter;
+                const matchesCategory = complaintCategoryFilter === "All" || comp.category === complaintCategoryFilter;
+                const matchesDept = complaintDeptFilter === "All" || comp.department === complaintDeptFilter;
+                const matchesSem = complaintSemFilter === "All" || comp.semester.toString() === complaintSemFilter;
+
+                return matchesSearch && matchesStatus && matchesCategory && matchesDept && matchesSem;
+              });
+
+              return (
+                <div className="space-y-4">
+                  {filteredComplaints.length === 0 ? (
+                    <div className="p-10 text-center text-slate-400 font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-150">
+                      No complaints or grievances found matching the current filters or query.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 font-extrabold uppercase tracking-wider">
+                            <th className="pb-3 pl-2">Grievance Title</th>
+                            <th className="pb-3">Category</th>
+                            <th className="pb-3">Student Identity</th>
+                            <th className="pb-3">Department/Sem</th>
+                            <th className="pb-3">Status</th>
+                            <th className="pb-3">Date Submitted</th>
+                            <th className="pb-3 text-right pr-2">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                          {filteredComplaints.map((comp) => {
+                            return (
+                              <tr key={comp.complaintId} className="hover:bg-slate-50/50 transition">
+                                <td className="py-3 pl-2 font-bold text-slate-800 max-w-[200px] truncate" title={comp.title}>
+                                  {comp.title}
+                                </td>
+                                <td className="py-3 text-slate-650">{comp.category}</td>
+                                <td className="py-3">
+                                  {comp.isAnonymous ? (
+                                    <span className="text-slate-450 italic font-medium">
+                                      Anonymous User
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-800 font-bold">{comp.name}</span>
+                                  )}
+                                </td>
+                                <td className="py-3 uppercase font-bold text-slate-600">
+                                  {departments.find(d => d.id === comp.department)?.code || comp.department} (S{comp.semester})
+                                </td>
+                                <td className="py-3">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                    comp.status === "Resolved" ? "bg-emerald-50 text-emerald-700 border-emerald-250" : 
+                                    comp.status === "Rejected" ? "bg-rose-50 text-rose-700 border-rose-250" : 
+                                    comp.status === "Under Review" ? "bg-purple-50 text-purple-700 border-purple-250" : 
+                                    "bg-amber-50 text-amber-700 border-amber-250"
+                                  }`}>
+                                    {comp.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-slate-400 font-mono font-medium">
+                                  {comp.createdAt ? new Date(comp.createdAt).toLocaleDateString() : "N/A"}
+                                </td>
+                                <td className="py-3 text-right pr-2">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => setSelectedComplaintDetail(comp)}
+                                      className="bg-indigo-55 hover:bg-indigo-100 text-indigo-750 font-extrabold text-[10px] uppercase px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 border border-indigo-150"
+                                    >
+                                      <Eye className="h-3 w-3" /> Review
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem("complaints", comp.complaintId, comp.title)}
+                                      className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 hover:text-rose-600 border border-transparent hover:border-rose-100 transition text-slate-500"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Detail Modal Overlay */}
+                  {selectedComplaintDetail && (
+                    <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
+                      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" onClick={() => setSelectedComplaintDetail(null)} />
+                      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full relative z-10 border border-slate-100 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                          <div>
+                            <h3 className="text-md sm:text-lg font-black text-slate-800 tracking-tight">Review Grievance</h3>
+                            <p className="text-xs text-slate-400 font-bold mt-0.5">Read details, set status, and provide administrative resolution remarks.</p>
+                          </div>
+                          <button
+                            onClick={() => setSelectedComplaintDetail(null)}
+                            className="rounded-lg p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-655 transition"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Status Banner */}
+                        {(() => {
+                          const status = selectedComplaintDetail.status;
+                          const bg = status === "Resolved" ? "bg-emerald-50 border-emerald-150 text-emerald-850" :
+                                     status === "Rejected" ? "bg-rose-50 border-rose-150 text-rose-850" :
+                                     status === "Under Review" ? "bg-purple-50 border-purple-150 text-purple-850" :
+                                     "bg-amber-50 border-amber-150 text-amber-805";
+                          return (
+                            <div className={`p-3 rounded-xl border ${bg} text-xs font-bold flex items-center justify-between`}>
+                              <span>Status: <span className="uppercase underline font-black">{status}</span></span>
+                              <span className="text-[10px] font-mono font-medium">Submitted: {new Date(selectedComplaintDetail.createdAt).toLocaleString()}</span>
+                            </div>
+                          );
+                        })()}
+
+                        <div className="space-y-3.5 text-xs">
+                          {/* Student identity details */}
+                          <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                            <span className="text-[10px] font-black uppercase text-indigo-650 tracking-wider block">Student Identity</span>
+                            {selectedComplaintDetail.isAnonymous ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase w-fit">
+                                  <span>🔒 Anonymous Submission</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 pt-1 font-semibold text-slate-650">
+                                  <p>Name: <span className="text-slate-400 italic">Anonymous User</span></p>
+                                  <p>Phone: <span className="text-slate-400 italic">Hidden</span></p>
+                                  <p className="col-span-2">Email: <span className="text-slate-400 italic">Hidden</span></p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2 font-semibold text-slate-655">
+                                <p>Name: <span className="font-bold text-slate-900">{selectedComplaintDetail.name}</span></p>
+                                <p>Phone: <span className="font-bold text-slate-800">{selectedComplaintDetail.phoneNumber}</span></p>
+                                <p className="col-span-2 font-sans">Email: <span className="font-semibold text-slate-800 underline">{selectedComplaintDetail.email || "N/A"}</span></p>
+                              </div>
+                            )}
+                            <div className="border-t border-slate-100 pt-2 grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-450 uppercase">
+                              <p>Department: <span className="text-slate-700">{departments.find(d => d.id === selectedComplaintDetail.department)?.name || selectedComplaintDetail.department}</span></p>
+                              <p>Semester: <span className="text-slate-700">Semester {selectedComplaintDetail.semester}</span></p>
+                            </div>
+                          </div>
+
+                          {/* Grievance Summary & Category */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block ml-1">Category & Title</span>
+                            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-1">
+                              <span className="bg-indigo-50 border border-indigo-100 text-indigo-750 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase w-fit block">{selectedComplaintDetail.category}</span>
+                              <h4 className="text-xs font-extrabold text-slate-900 pt-1">{selectedComplaintDetail.title}</h4>
+                            </div>
+                          </div>
+
+                          {/* Grievance description */}
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block ml-1 font-sans">Detailed Description</span>
+                            <p className="p-3 bg-white border border-slate-150 rounded-2xl text-slate-700 font-medium leading-relaxed font-sans whitespace-pre-wrap">
+                              {selectedComplaintDetail.description}
+                            </p>
+                          </div>
+
+                          {/* Admin Remarks Input */}
+                          <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                            <label className="text-[10px] font-extrabold text-indigo-650 uppercase tracking-widest block ml-1">Resolution & Remarks</label>
+                            <textarea
+                              rows={3}
+                              value={complaintRemarksInput}
+                              onChange={(e) => setComplaintRemarksInput(e.target.value)}
+                              placeholder="Write administrative action details, remarks or investigation status..."
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 font-sans"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap gap-2 justify-between pt-2 border-t border-slate-100 text-xs font-bold">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedComplaintDetail(null);
+                              handleDeleteItem("complaints", selectedComplaintDetail.complaintId, selectedComplaintDetail.title);
+                            }}
+                            className="rounded-xl px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 transition uppercase text-[10px] font-extrabold flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </button>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveComplaintRemarks(selectedComplaintDetail.complaintId)}
+                              className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 transition uppercase text-[10px] font-extrabold"
+                            >
+                              Save Remarks
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateComplaintStatus(selectedComplaintDetail.complaintId, "Rejected")}
+                              className="rounded-xl bg-rose-50 hover:bg-rose-650 text-rose-700 hover:text-white px-3 py-2 text-[10px] font-extrabold uppercase transition"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateComplaintStatus(selectedComplaintDetail.complaintId, "Under Review")}
+                              className="rounded-xl bg-purple-50 hover:bg-purple-650 text-purple-700 hover:text-white px-3 py-2 text-[10px] font-extrabold uppercase transition border border-purple-200 hover:border-transparent"
+                            >
+                              Under Review
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateComplaintStatus(selectedComplaintDetail.complaintId, "Resolved")}
+                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-[10px] font-extrabold uppercase text-white transition"
+                            >
+                              Resolve
                             </button>
                           </div>
                         </div>

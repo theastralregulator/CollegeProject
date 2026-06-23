@@ -67,5 +67,15 @@ service cloud.firestore {
     match /studentRequests/{reqId} {
       allow read, write: if true;
     }
+
+    // Attendance rules
+    match /attendance/{attendanceId} {
+      allow read, write: if true;
+    }
+
+    // Complaints rules
+    match /complaints/{complaintId} {
+      allow read, write: if true;
+    }
   }
 }

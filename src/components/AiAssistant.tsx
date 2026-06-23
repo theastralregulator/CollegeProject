@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Send, Sparkles, Mic, MicOff, Volume2, VolumeX, Bot, User, CornerDownLeft, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Notice, BloodDonor, Note, Assignment, Department, Teacher, QuestionPaper, CollegeInformation } from "../types";
+import { Notice, BloodDonor, Note, Assignment, Department, Teacher, QuestionPaper, CollegeInformation, AttendanceRecord } from "../types";
 
 interface Message {
   role: "user" | "model";
@@ -20,6 +20,7 @@ interface AiAssistantProps {
   faculty: Teacher[];
   questionPapers: QuestionPaper[];
   collegeInformation: CollegeInformation[];
+  attendance: AttendanceRecord[];
 }
 
 export default function AiAssistant({
@@ -33,6 +34,7 @@ export default function AiAssistant({
   faculty,
   questionPapers,
   collegeInformation,
+  attendance,
 }: AiAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -241,6 +243,80 @@ export default function AiAssistant({
         infoMatches.forEach(info => {
           matchedParts.push(`- ${info.title}: ${info.content}`);
         });
+      }
+
+      // H2. ATTENDANCE RECORD CHECK
+      const isAttendanceQuery = q.includes("attendance") || q.includes("shortage") || q.includes("present") || q.includes("absent") || q.includes("percentage") || q.includes("low") || q.includes("bunk") || q.includes("pct") || q.includes("short");
+      if (isAttendanceQuery) {
+        const attendanceMatches = attendance.filter(a => {
+          const studentNameLower = a.studentName.toLowerCase();
+          const matchesStudent = q.includes(studentNameLower) || (a.studentId && q.includes(a.studentId.toLowerCase()));
+          
+          const semStr = a.semester.toString();
+          const matchesSem = q.includes(`s${semStr}`) || q.includes(`sem ${semStr}`) || q.includes(`sem-${semStr}`) || q.includes(`semester ${semStr}`);
+          
+          const deptLower = a.department.toLowerCase();
+          const matchesDept = q.includes(deptLower) || 
+                              (deptLower.includes("computer") && (q.includes("computer") || q.includes("ct"))) ||
+                              (deptLower.includes("hardware") && (q.includes("hardware") || q.includes("che"))) ||
+                              (deptLower.includes("electronics") && (q.includes("electronics") || q.includes("el")));
+          
+          const monthLower = a.month.toLowerCase();
+          const matchesMonth = q.includes(monthLower);
+
+          const isLowSearch = q.includes("low") || q.includes("shortage") || q.includes("short");
+          const matchesLow = isLowSearch ? a.attendancePercentage < 75 : true;
+
+          const hasStudentFilter = attendance.some(x => q.includes(x.studentName.toLowerCase()) || (x.studentId && q.includes(x.studentId.toLowerCase())));
+          const hasSemFilter = /s[1-6]|sem\s*[1-6]|semester\s*[1-6]/i.test(q);
+          const hasDeptFilter = q.includes("computer") || q.includes("hardware") || q.includes("electronics") || q.includes("ct") || q.includes("che") || q.includes("el") || q.includes("dept") || q.includes("department");
+          const hasMonthFilter = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"].some(m => q.includes(m));
+
+          let score = 0;
+          if (hasStudentFilter && matchesStudent) score += 4;
+          if (hasSemFilter && matchesSem) score += 2;
+          if (hasDeptFilter && matchesDept) score += 2;
+          if (hasMonthFilter && matchesMonth) score += 2;
+
+          if (hasStudentFilter || hasSemFilter || hasDeptFilter || hasMonthFilter) {
+            return score > 0 && matchesLow;
+          }
+          
+          return matchesLow;
+        });
+
+        if (attendanceMatches.length > 0) {
+          matchCategories.push("Attendance");
+          matchedParts.push("\nMATCHED STUDENT ATTENDANCE RECORDS:");
+          
+          const sortedMatches = [...attendanceMatches].sort((a, b) => {
+            const nameComp = a.studentName.localeCompare(b.studentName);
+            if (nameComp !== 0) return nameComp;
+            return a.month.localeCompare(b.month);
+          });
+
+          sortedMatches.slice(0, 20).forEach(a => {
+            matchedParts.push(`- Student: ${a.studentName} (Admission: ${a.studentId})`);
+            matchedParts.push(`  Department: ${a.department}, Semester: S${a.semester}, Month: ${a.month}`);
+            matchedParts.push(`  Attendance Percentage: ${a.attendancePercentage}% ${a.attendancePercentage < 75 ? '(ATTENDANCE SHORTAGE - Alert)' : ''}`);
+          });
+
+          if (attendanceMatches.length > 20) {
+            matchedParts.push(`- Note: Truncated ${attendanceMatches.length - 20} more matching records.`);
+          }
+        }
+      }
+
+      // H3. COMPLAINTS & SUGGESTIONS CHECK
+      const isComplaintQuery = q.includes("complaint") || q.includes("grievance") || q.includes("suggestion") || q.includes("feedback") || q.includes("complaining") || q.includes("box") || q.includes("abuse") || q.includes("ragging");
+      if (isComplaintQuery) {
+        matchCategories.push("Complaint Box");
+        const compInfo = collegeInformation.find(info => info.id === "complaints_info");
+        if (compInfo) {
+          matchedParts.push("\nMATCHED COMPLAINT BOX REDRESSAL DIRECTIVES:");
+          matchedParts.push(`- ${compInfo.title}: ${compInfo.content}`);
+          matchedParts.push(`- Action Directive: Instruct the student to navigate to the "Complaint Box" page, accessible via the Home page Quick Access menu or the "More" navigation menu. Remind them that submissions can be made anonymously or with their identity.`);
+        }
       }
 
       // I. FALLBACK GENERAL CONTEXT if search matched absolutely nothing (so we still give solid grounding context)

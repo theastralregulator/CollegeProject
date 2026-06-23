@@ -122,3 +122,33 @@ export interface CollegeInformation {
   content: string;
 }
 
+export interface AttendanceRecord {
+  attendanceId: string;
+  studentId: string;
+  studentName: string;
+  department: string;
+  semester: number;
+  month: string;
+  attendancePercentage: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Complaint {
+  complaintId: string;
+  name: string;
+  phoneNumber: string;
+  email?: string;
+  department: string;
+  semester: number;
+  category: string;
+  title: string;
+  description: string;
+  isAnonymous: boolean;
+  status: 'Pending' | 'Under Review' | 'Resolved' | 'Rejected';
+  adminRemarks: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
