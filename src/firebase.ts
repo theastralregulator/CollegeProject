@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCPOJ75w5cN41mmyhZxuN7URBO-X-hL0qU",
@@ -19,6 +20,9 @@ export const auth = getAuth(app);
 
 // Initialize Firestore connecting it to the specific database ID
 export const db = getFirestore(app, "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e");
+
+// Initialize Storage
+export const storage = getStorage(app);
 
 export enum OperationType {
   CREATE = 'create',

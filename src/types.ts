@@ -203,6 +203,7 @@ export interface AdminPermissions {
   databaseTools: boolean;
   backupReports: boolean;
   securityCenter: boolean;
+  messages: boolean;
 }
 
 export interface AdminUser {
@@ -249,6 +250,35 @@ export interface Announcement {
   type: "global" | "emergency";
   publishDate: string;
   scheduleTime?: string;
+}
+
+export interface Message {
+  id?: string;
+  senderId: string;
+  senderRole: string;
+  receiverId: string;
+  receiverRole: string;
+  participantIds: string[];
+  message: string;
+  createdAt: string;
+  read: boolean;
+  deleted: boolean;
+  pinned?: boolean;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+}
+
+export interface ConversationMeta {
+  id: string; // adminUid
+  adminUid: string;
+  adminName: string;
+  adminRole: string;
+  pinned: boolean;
+  isImportant: boolean;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
 }
 
 

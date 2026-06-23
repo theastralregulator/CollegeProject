@@ -15,24 +15,28 @@ export const DEFAULT_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
     notes: true, assignments: true, qpapers: true,
     bloodbank: false, requests: false, outsiderDonors: false, complaints: false, adminManagement: false,
     activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
+    messages: true,
   },
   support_admin: {
     notices: false, teachers: false, students: false, attendance: false,
     notes: false, assignments: false, qpapers: false,
     bloodbank: false, requests: false, outsiderDonors: false, complaints: false, adminManagement: false,
     activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
+    messages: true,
   },
   admin: {
     notices: true, teachers: true, students: true, attendance: true,
     notes: true, assignments: true, qpapers: true,
     bloodbank: true, requests: true, outsiderDonors: true, complaints: true, adminManagement: false,
     activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
+    messages: true,
   },
   super_admin: {
     notices: true, teachers: true, students: true, attendance: true,
     notes: true, assignments: true, qpapers: true,
     bloodbank: true, requests: true, outsiderDonors: true, complaints: true, adminManagement: true,
     activityLogs: true, systemSettings: true, announcements: true, databaseTools: true, backupReports: true, securityCenter: true,
+    messages: true,
   },
 };
 

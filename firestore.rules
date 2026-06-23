@@ -113,6 +113,23 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Messages rules
+    match /messages/{msgId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if request.auth != null && (
+        request.auth.uid in resource.data.participantIds ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
+    }
+
+    // Conversations metadata rules
+    match /conversations/{adminId} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == adminId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
+    }
+
     // Activity Logs — authenticated access only
     match /activityLogs/{logId} {
       allow read: if request.auth != null;

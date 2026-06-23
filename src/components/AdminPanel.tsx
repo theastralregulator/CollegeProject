@@ -15,7 +15,10 @@ import {
   doc, 
   setDoc,
   updateDoc,
-  increment
+  increment,
+  query,
+  where,
+  onSnapshot
 } from "firebase/firestore";
 import { auth, db, handleFirestoreError, OperationType } from "../firebase";
 import { 
@@ -26,7 +29,7 @@ import {
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
   Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart, Crown, Shield,
-  Settings, Megaphone, Database, DownloadCloud, History
+  Settings, Megaphone, Database, DownloadCloud, History, MessageCircle
 } from "lucide-react";
 import { useAdminRole } from "../hooks/useAdminRole";
 import AdminManagement from "./AdminManagement";
@@ -37,6 +40,7 @@ import DatabaseToolsView from "./DatabaseToolsView";
 import BackupReportsView from "./BackupReportsView";
 import SecurityCenter from "./SecurityCenter";
 import ActivityLogsView from "./ActivityLogsView";
+import CommunicationCenter from "./CommunicationCenter";
 
 
 interface AdminPanelProps {
@@ -102,11 +106,30 @@ export default function AdminPanel({
   // Active Admin Submenu
   const [activeSubTab, setActiveSubTab] = useState<
     "dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors" | "adminManagement" |
-    "activityLogs" | "systemSettings" | "announcements" | "databaseTools" | "backupReports" | "securityCenter"
+    "activityLogs" | "systemSettings" | "announcements" | "databaseTools" | "backupReports" | "securityCenter" | "messages"
   >("dashboard");
 
   // Role-based access
   const { role, adminData, permissions, loading: roleLoading } = useAdminRole(user);
+
+  // Unread messages count for communication center
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadMessagesCount(0);
+      return;
+    }
+    const q = query(
+      collection(db, "messages"),
+      where("receiverId", "==", user.uid),
+      where("read", "==", false)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUnreadMessagesCount(snap.size);
+    });
+    return unsub;
+  }, [user?.uid]);
 
   // Outsider Donor States
   const [extDonorSearchQuery, setExtDonorSearchQuery] = useState("");
@@ -1269,6 +1292,7 @@ export default function AdminPanel({
             { id: "databaseTools", label: "Database Tools", icon: Database, perm: "databaseTools" },
             { id: "backupReports", label: "Backup & Reports", icon: DownloadCloud, perm: "backupReports" },
             { id: "securityCenter", label: "Security Center", icon: Shield, perm: "securityCenter" },
+            { id: "messages", label: unreadMessagesCount > 0 ? `Messages (${unreadMessagesCount})` : "Messages", icon: MessageCircle, perm: "messages" },
           ] as { id: string; label: string; icon: any; perm: string | null }[])
             .filter((sub) => {
               if (!sub.perm) return true; // dashboard always visible
@@ -4219,6 +4243,13 @@ export default function AdminPanel({
                 <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can access the security center.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Messages Tab — Accessible to all admins */}
+        {activeSubTab === "messages" && (
+          <div className="animate-fade-in">
+            <CommunicationCenter />
           </div>
         )}
 
