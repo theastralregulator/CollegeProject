@@ -179,3 +179,35 @@ export interface OutsiderBloodDonorRequest {
   status: "Pending" | "Approved" | "Rejected";
   createdAt: string;
 }
+
+// ── Role-Based Admin System ──────────────────────────────────────────────────
+
+export type AdminRole = "student_admin" | "admin" | "super_admin";
+
+export interface AdminPermissions {
+  notices: boolean;
+  teachers: boolean;
+  students: boolean;
+  attendance: boolean;
+  notes: boolean;
+  assignments: boolean;
+  qpapers: boolean;
+  bloodbank: boolean;
+  requests: boolean;
+  outsiderDonors: boolean;
+  complaints: boolean;
+  adminManagement: boolean;
+}
+
+export interface AdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  phone: string;
+  role: AdminRole;
+  suspended: boolean;
+  customPermissions?: Partial<AdminPermissions>;
+  createdAt: string;
+  createdBy?: string;
+}
+

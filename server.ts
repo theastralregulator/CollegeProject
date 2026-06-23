@@ -162,7 +162,136 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
     }
   });
 
-  // 3. Health check route
+  // 3. Admin Management API routes (Super Admin only — uses Firebase Admin SDK)
+
+  // Helper: lazily initialize and return firebase-admin app
+  async function getAdminApp() {
+    const admin = await import("firebase-admin").catch(() => null);
+    if (!admin) throw new Error("firebase-admin module not available");
+
+    if (!admin.apps || admin.apps.length === 0) {
+      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+        : null;
+      if (serviceAccount) {
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+      } else {
+        admin.initializeApp({
+          credential: admin.credential.applicationDefault(),
+          projectId: "ai-studio-applet-webapp-d8652",
+        });
+      }
+    }
+    return admin;
+  }
+
+  // POST /api/create-admin — create Firebase Auth user + adminUsers doc
+  app.post("/api/create-admin", async (req, res) => {
+    try {
+      const { name, email, phone, role, password, createdBy } = req.body;
+      if (!name || !email || !role || !password) {
+        res.status(400).json({ error: "VALIDATION_ERROR", message: "Name, email, role, and password are required." });
+        return;
+      }
+      const admin = await getAdminApp();
+      const db = admin.firestore();
+      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+
+      // Create Firebase Auth user
+      const userRecord = await admin.auth().createUser({ email, password, displayName: name });
+
+      // Write adminUsers doc
+      await db.collection("adminUsers").doc(userRecord.uid).set({
+        uid: userRecord.uid,
+        email,
+        name,
+        phone: phone || "",
+        role,
+        suspended: false,
+        createdAt: new Date().toISOString(),
+        createdBy: createdBy || "super_admin",
+      });
+
+      res.json({ success: true, uid: userRecord.uid });
+    } catch (err: any) {
+      console.error("[Create Admin API] Error:", err);
+      if (err.code === "auth/email-already-exists") {
+        res.status(409).json({ error: "EMAIL_EXISTS", message: "An account with this email already exists." });
+      } else {
+        res.status(500).json({ error: "SERVER_ERROR", message: err.message || "Failed to create admin." });
+      }
+    }
+  });
+
+  // POST /api/update-admin — update role, name, phone, suspension, customPermissions
+  app.post("/api/update-admin", async (req, res) => {
+    try {
+      const { uid, updates } = req.body;
+      if (!uid || !updates) {
+        res.status(400).json({ error: "VALIDATION_ERROR", message: "uid and updates are required." });
+        return;
+      }
+      const admin = await getAdminApp();
+      const db = admin.firestore();
+      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+
+      await db.collection("adminUsers").doc(uid).update({
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // If new displayName provided, update Auth too
+      if (updates.name) {
+        await admin.auth().updateUser(uid, { displayName: updates.name });
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Update Admin API] Error:", err);
+      res.status(500).json({ error: "SERVER_ERROR", message: err.message || "Failed to update admin." });
+    }
+  });
+
+  // POST /api/reset-admin-password — reset password for a given uid
+  app.post("/api/reset-admin-password", async (req, res) => {
+    try {
+      const { uid, newPassword } = req.body;
+      if (!uid || !newPassword || newPassword.length < 6) {
+        res.status(400).json({ error: "VALIDATION_ERROR", message: "uid and a newPassword (min 6 chars) are required." });
+        return;
+      }
+      const admin = await getAdminApp();
+      await admin.auth().updateUser(uid, { password: newPassword });
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Reset Password API] Error:", err);
+      res.status(500).json({ error: "SERVER_ERROR", message: err.message || "Failed to reset password." });
+    }
+  });
+
+  // POST /api/delete-admin — delete Firebase Auth user + adminUsers doc
+  app.post("/api/delete-admin", async (req, res) => {
+    try {
+      const { uid } = req.body;
+      if (!uid) {
+        res.status(400).json({ error: "VALIDATION_ERROR", message: "uid is required." });
+        return;
+      }
+      const admin = await getAdminApp();
+      const db = admin.firestore();
+      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+
+      await admin.auth().deleteUser(uid);
+      await db.collection("adminUsers").doc(uid).delete();
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("[Delete Admin API] Error:", err);
+      res.status(500).json({ error: "SERVER_ERROR", message: err.message || "Failed to delete admin." });
+    }
+  });
+
+  // 4. Health check route
   app.get("/api/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   });

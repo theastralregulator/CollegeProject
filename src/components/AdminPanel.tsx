@@ -25,8 +25,10 @@ import {
 import { 
   LayoutDashboard, Bell, Users, GraduationCap, ClipboardList, BookOpen, 
   FileText, Droplet, LogIn, LogOut, CheckCircle, Trash2, Plus, AlertCircle, Sparkles, ClipboardCheck,
-  Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart
+  Search, Eye, X, Check, Filter, Clock, MessageSquare, Lock, Heart, Crown, Shield
 } from "lucide-react";
+import { useAdminRole } from "../hooks/useAdminRole";
+import AdminManagement from "./AdminManagement";
 
 interface AdminPanelProps {
   notices: Notice[];
@@ -89,7 +91,10 @@ export default function AdminPanel({
   const [customCategory, setCustomCategory] = useState("");
 
   // Active Admin Submenu
-  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors">("dashboard");
+  const [activeSubTab, setActiveSubTab] = useState<"dashboard" | "notices" | "teachers" | "students" | "notes" | "assignments" | "qpapers" | "bloodbank" | "requests" | "attendance" | "complaints" | "outsiderDonors" | "adminManagement">("dashboard");
+
+  // Role-based access
+  const { role, adminData, permissions, loading: roleLoading } = useAdminRole(user);
 
   // Outsider Donor States
   const [extDonorSearchQuery, setExtDonorSearchQuery] = useState("");
@@ -1173,11 +1178,28 @@ export default function AdminPanel({
 
       <div className="rounded-3xl border border-slate-100 bg-white p-5 lg:col-span-1 shadow-xs">
         <div className="flex items-center space-x-3 border-b border-slate-100 pb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-            <Sparkles className="h-5 w-5" />
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            role === "super_admin" ? "bg-purple-50 text-purple-600" :
+            role === "student_admin" ? "bg-emerald-50 text-emerald-600" :
+            "bg-orange-50 text-orange-600"
+          }`}>
+            {role === "super_admin" ? <Crown className="h-5 w-5" /> : role === "student_admin" ? <BookOpen className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-800">Administrator</h3>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-800">
+                {adminData?.name || "Administrator"}
+              </h3>
+              {role && (
+                <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                  role === "super_admin" ? "bg-purple-100 text-purple-700" :
+                  role === "student_admin" ? "bg-emerald-100 text-emerald-700" :
+                  "bg-blue-100 text-blue-700"
+                }`}>
+                  {role === "super_admin" ? "Super Admin" : role === "student_admin" ? "Student Admin" : "Admin"}
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-slate-400 font-semibold truncate max-w-[140px]" title={user.email || ""}>
               {user.email}
             </p>
@@ -1185,34 +1207,47 @@ export default function AdminPanel({
         </div>
 
         <nav className="mt-5 space-y-1">
-          {[
-            { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-            { id: "notices", label: "Manage Notices", icon: Bell },
-            { id: "teachers", label: "Manage Faculty", icon: Users },
-            { id: "students", label: "Manage Students", icon: GraduationCap },
-            { id: "attendance", label: "Manage Attendance", icon: Clock },
-            { id: "notes", label: "Manage Notes", icon: BookOpen },
-            { id: "assignments", label: "Assignments", icon: ClipboardList },
-            { id: "qpapers", label: "Question Papers", icon: FileText },
-            { id: "bloodbank", label: "Blood Donors", icon: Droplet },
-            { id: "requests", label: "Student Requests", icon: ClipboardCheck },
-            { id: "outsiderDonors", label: "Outsider Donors", icon: Heart },
-            { id: "complaints", label: "Complaints", icon: MessageSquare },
-          ].map((sub) => {
+          {([
+            { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: null },
+            { id: "notices", label: "Manage Notices", icon: Bell, perm: "notices" },
+            { id: "teachers", label: "Manage Faculty", icon: Users, perm: "teachers" },
+            { id: "students", label: "Manage Students", icon: GraduationCap, perm: "students" },
+            { id: "attendance", label: "Manage Attendance", icon: Clock, perm: "attendance" },
+            { id: "notes", label: "Manage Notes", icon: BookOpen, perm: "notes" },
+            { id: "assignments", label: "Assignments", icon: ClipboardList, perm: "assignments" },
+            { id: "qpapers", label: "Question Papers", icon: FileText, perm: "qpapers" },
+            { id: "bloodbank", label: "Blood Donors", icon: Droplet, perm: "bloodbank" },
+            { id: "requests", label: "Student Requests", icon: ClipboardCheck, perm: "requests" },
+            { id: "outsiderDonors", label: "Outsider Donors", icon: Heart, perm: "outsiderDonors" },
+            { id: "complaints", label: "Complaints", icon: MessageSquare, perm: "complaints" },
+            { id: "adminManagement", label: "Admin Management", icon: Crown, perm: "adminManagement" },
+          ] as { id: string; label: string; icon: any; perm: string | null }[])
+            .filter((sub) => {
+              if (!sub.perm) return true; // dashboard always visible
+              if (!permissions) return false;
+              return (permissions as any)[sub.perm] === true;
+            })
+            .map((sub) => {
             const Icon = sub.icon;
             const isSubActive = activeSubTab === sub.id;
+            const isSuperOnly = sub.id === "adminManagement";
             return (
               <button
                 key={sub.id}
                 onClick={() => setActiveSubTab(sub.id as any)}
                 className={`flex w-full items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  isSubActive 
-                    ? "bg-blue-50 text-blue-700 shadow-2xs" 
+                  isSubActive
+                    ? isSuperOnly ? "bg-purple-50 text-purple-700 shadow-2xs" : "bg-blue-50 text-blue-700 shadow-2xs"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isSubActive ? "text-blue-600" : "text-slate-400"}`} />
+                <Icon className={`h-4 w-4 ${
+                  isSubActive ? (isSuperOnly ? "text-purple-600" : "text-blue-600") : "text-slate-400"
+                }`} />
                 <span>{sub.label}</span>
+                {isSuperOnly && (
+                  <span className="ml-auto text-[9px] font-black bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-md">SA</span>
+                )}
               </button>
             );
           })}
@@ -4000,6 +4035,24 @@ export default function AdminPanel({
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* Admin Management Tab — Super Admin Only */}
+        {activeSubTab === "adminManagement" && (
+          <div className="animate-fade-in">
+            {role === "super_admin" ? (
+              <AdminManagement
+                currentAdminUid={user.uid}
+                currentAdminEmail={user.email || ""}
+              />
+            ) : (
+              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
+                <p className="text-sm font-black text-red-600">Access Denied</p>
+                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can manage admin accounts.</p>
+              </div>
+            )}
           </div>
         )}
 
