@@ -34,7 +34,6 @@ import {
 import { useAdminRole } from "../hooks/useAdminRole";
 import AdminManagement from "./AdminManagement";
 import SuperAdminDashboard from "./SuperAdminDashboard";
-import SystemSettingsView from "./SystemSettingsView";
 import AnnouncementCenter from "./AnnouncementCenter";
 import DatabaseToolsView from "./DatabaseToolsView";
 import BackupReportsView from "./BackupReportsView";
@@ -235,6 +234,122 @@ export default function AdminPanel({
     }
   }, [selectedComplaintDetail?.complaintId]);
 
+  // Session tracking state to detect transition from logged-in to logged-out
+  const [prevAdminData, setPrevAdminData] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (adminData) {
+      setPrevAdminData(adminData);
+      
+      // Check if we already logged this session
+      const currentSessionUid = sessionStorage.getItem("campusai_login_logged_uid");
+      if (currentSessionUid === adminData.uid) return;
+      
+      const recordLogin = async () => {
+        try {
+          const now = new Date();
+          const dateStr = now.toISOString().split("T")[0];
+          const timeStr = now.toLocaleTimeString([], { hour12: false });
+          
+          // Write successful login to login_history
+          const docRef = await addDoc(collection(db, "login_history"), {
+            userName: adminData.name,
+            email: adminData.email,
+            role: adminData.role,
+            loginDate: dateStr,
+            loginTime: timeStr,
+            logoutTime: "",
+            sessionDuration: 0,
+            timestamp: now.toISOString()
+          });
+
+          // Write to activityLogs
+          await addDoc(collection(db, "activityLogs"), {
+            userName: adminData.name,
+            role: adminData.role,
+            action: "Logged In",
+            date: dateStr,
+            time: timeStr
+          });
+
+          // Write to security_logs
+          await addDoc(collection(db, "security_logs"), {
+            type: "successful_login",
+            userName: adminData.name,
+            email: adminData.email,
+            role: adminData.role,
+            date: dateStr,
+            time: timeStr,
+            timestamp: now.toISOString()
+          });
+
+          sessionStorage.setItem("campusai_login_logged_uid", adminData.uid);
+          sessionStorage.setItem("campusai_login_doc_id", docRef.id);
+          sessionStorage.setItem("campusai_login_time", now.getTime().toString());
+        } catch (err) {
+          console.error("Failed to log successful login session:", err);
+        }
+      };
+
+      recordLogin();
+    } else if (!user && prevAdminData) {
+      // Transition from logged-in to logged-out!
+      const recordLogout = async () => {
+        const loginDocId = sessionStorage.getItem("campusai_login_doc_id");
+        const loginTimeStr = sessionStorage.getItem("campusai_login_time");
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        const timeStr = now.toLocaleTimeString([], { hour12: false });
+
+        if (loginDocId && loginTimeStr) {
+          const loginTime = parseInt(loginTimeStr, 10);
+          const durationSec = Math.round((now.getTime() - loginTime) / 1000);
+          try {
+            await updateDoc(doc(db, "login_history", loginDocId), {
+              logoutTime: timeStr,
+              sessionDuration: durationSec
+            });
+          } catch (err) {
+            console.error("Failed to update logout time:", err);
+          }
+        }
+
+        try {
+          await addDoc(collection(db, "activityLogs"), {
+            userName: prevAdminData.name,
+            role: prevAdminData.role,
+            action: "Logged Out",
+            date: dateStr,
+            time: timeStr
+          });
+        } catch (err) {
+          console.error("Failed to write logout activity log:", err);
+        }
+
+        try {
+          await addDoc(collection(db, "security_logs"), {
+            type: "logout",
+            userName: prevAdminData.name,
+            email: prevAdminData.email,
+            role: prevAdminData.role,
+            date: dateStr,
+            time: timeStr,
+            timestamp: now.toISOString()
+          });
+        } catch (err) {
+          console.error("Failed to write logout security log:", err);
+        }
+
+        sessionStorage.removeItem("campusai_login_logged_uid");
+        sessionStorage.removeItem("campusai_login_doc_id");
+        sessionStorage.removeItem("campusai_login_time");
+        setPrevAdminData(null);
+      };
+
+      recordLogout();
+    }
+  }, [user, adminData, prevAdminData]);
+
   useEffect(() => {
     const savedAdminEmail = localStorage.getItem("campusai_admin_email");
     if (savedAdminEmail) {
@@ -281,6 +396,39 @@ export default function AdminPanel({
       setPassword("");
     } catch (err: any) {
       console.log("Failed standard signin. Code:", err.code);
+
+      // Record failed login attempt
+      const recordFailedLogin = async () => {
+        try {
+          const now = new Date();
+          let errorCode = err.code || "auth/unknown";
+          let errorMsg = err.message || "Authentication failed.";
+          
+          if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+            errorCode = "Wrong Password";
+            errorMsg = "The password entered is incorrect.";
+          } else if (err.code === "auth/user-not-found") {
+            errorCode = "User Not Found";
+            errorMsg = "No account found with this email.";
+          } else if (err.code === "auth/user-disabled") {
+            errorCode = "Account Disabled";
+            errorMsg = "This administrator account has been disabled.";
+          }
+
+          await addDoc(collection(db, "security_logs"), {
+            emailEntered: email.trim(),
+            date: now.toISOString().split("T")[0],
+            time: now.toLocaleTimeString([], { hour12: false }),
+            errorCode,
+            errorMessage: errorMsg,
+            type: "failed_login",
+            timestamp: now.toISOString()
+          });
+        } catch (e) {
+          console.error("Failed to log security log:", e);
+        }
+      };
+      recordFailedLogin();
       
       // If default credentials fail, register the admin user automatically
       if (isDefaultCredential && (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential")) {
@@ -1300,7 +1448,6 @@ export default function AdminPanel({
             { id: "complaints", label: "Complaints", icon: MessageSquare, perm: "complaints" },
             { id: "adminManagement", label: "Admin Management", icon: Crown, perm: "adminManagement" },
             { id: "activityLogs", label: "Activity Logs", icon: History, perm: "activityLogs" },
-            { id: "systemSettings", label: "System Settings", icon: Settings, perm: "systemSettings" },
             { id: "announcements", label: "Announcement Center", icon: Megaphone, perm: "announcements" },
             { id: "databaseTools", label: "Database Tools", icon: Database, perm: "databaseTools" },
             { id: "backupReports", label: "Backup & Reports", icon: DownloadCloud, perm: "backupReports" },
@@ -1317,7 +1464,7 @@ export default function AdminPanel({
             const Icon = sub.icon;
             const isSubActive = activeSubTab === sub.id;
             const isSuperOnly = [
-              "adminManagement", "activityLogs", "systemSettings", 
+              "adminManagement", "activityLogs",
               "announcements", "databaseTools", "backupReports", "securityCenter", "siteControl"
             ].includes(sub.id);
             return (
@@ -4185,20 +4332,7 @@ export default function AdminPanel({
           </div>
         )}
 
-        {/* System Settings Tab — Super Admin Only */}
-        {activeSubTab === "systemSettings" && (
-          <div className="animate-fade-in">
-            {role === "super_admin" ? (
-              <SystemSettingsView />
-            ) : (
-              <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
-                <Shield className="mx-auto h-8 w-8 text-red-300 mb-3" />
-                <p className="text-sm font-black text-red-600">Access Denied</p>
-                <p className="text-xs text-red-400 font-semibold mt-1">Only Super Admins can view system settings.</p>
-              </div>
-            )}
-          </div>
-        )}
+
 
         {/* Announcement Center Tab — Super Admin Only */}
         {activeSubTab === "announcements" && (

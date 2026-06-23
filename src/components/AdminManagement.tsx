@@ -215,7 +215,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     if (!editingAdmin) return;
     setIsSaving(true);
     try {
-      const { doc, updateDoc } = await import("firebase/firestore");
+      const { doc, updateDoc, addDoc, collection } = await import("firebase/firestore");
       const userDocRef = doc(db, "users", editingAdmin.uid);
       const permissions = (useCustomPerms || editRole === "support_admin") ? editCustomPerms : DEFAULT_PERMISSIONS[editRole];
 
@@ -225,6 +225,41 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
         permissions,
         updatedAt: new Date().toISOString(),
       });
+
+      // Track suspension / activation if changed
+      if (editingAdmin.suspended !== editSuspended) {
+        const actionType = editSuspended ? "Account Suspension" : "Account Activation";
+        const actionDesc = `${actionType} for administrator ${editingAdmin.name}`;
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        const timeStr = now.toLocaleTimeString([], { hour12: false });
+
+        try {
+          await addDoc(collection(db, "activityLogs"), {
+            userName: "Super Admin",
+            role: "super_admin",
+            action: actionDesc,
+            date: dateStr,
+            time: timeStr,
+          });
+        } catch (e) {
+          console.error("Failed to log activity log:", e);
+        }
+
+        try {
+          await addDoc(collection(db, "security_logs"), {
+            type: editSuspended ? "suspension" : "activation",
+            action: actionDesc,
+            targetUser: editingAdmin.name,
+            targetEmail: editingAdmin.email,
+            date: dateStr,
+            time: timeStr,
+            timestamp: now.toISOString()
+          });
+        } catch (e) {
+          console.error("Failed to log security log:", e);
+        }
+      }
 
       showToast("success", `Admin "${editingAdmin.name}" updated.`);
       setEditingAdmin(null);
@@ -246,6 +281,36 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
       const { auth: mainAuth } = await import("../firebase");
       const { sendPasswordResetEmail } = await import("firebase/auth");
       await sendPasswordResetEmail(mainAuth, targetAdmin.email);
+
+      // Track password reset
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr = now.toLocaleTimeString([], { hour12: false });
+      const actionDesc = `Password Reset Email Sent for admin ${targetAdmin.name}`;
+
+      try {
+        const { addDoc, collection } = await import("firebase/firestore");
+        await addDoc(collection(db, "activityLogs"), {
+          userName: "Super Admin",
+          role: "super_admin",
+          action: actionDesc,
+          date: dateStr,
+          time: timeStr,
+        });
+
+        await addDoc(collection(db, "security_logs"), {
+          type: "password_reset",
+          action: actionDesc,
+          targetUser: targetAdmin.name,
+          targetEmail: targetAdmin.email,
+          date: dateStr,
+          time: timeStr,
+          timestamp: now.toISOString()
+        });
+      } catch (e) {
+        console.error("Failed to log password reset:", e);
+      }
+
       showToast("success", `Password reset email sent to ${targetAdmin.email}.`);
       setShowPasswordReset(null);
     } catch (err: any) {

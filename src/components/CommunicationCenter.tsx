@@ -214,14 +214,25 @@ export default function CommunicationCenter({ user, adminData }: CommunicationCe
     } else {
       // Find a super admin or default to Sabin's whitelist email user
       // Since normal admins can only message Super Admin, we direct it to the whitelist admin
-      // Query super_admin UID from users list or default
       try {
-        const uSnap = await getDocs(query(collection(db, "users"), where("role", "==", "super_admin")));
-        let superAdminUid = "sabinsaji-superadmin-uid"; // default fallback
+        const uSnap = await getDocs(collection(db, "users"));
+        let superAdminUid = "";
         uSnap.forEach((d) => {
-          superAdminUid = d.id;
+          const uData = d.data();
+          const email = (uData.email || "").toLowerCase();
+          if (uData.role === "super_admin" || ["sabinsaji3900@gmail.com", "admin@gptckaduthuruthy.edu.in"].includes(email)) {
+            superAdminUid = d.id || uData.uid;
+          }
         });
-        targetReceiverId = superAdminUid;
+
+        if (!superAdminUid) {
+          const msgWithSuperAdmin = messages.find(m => m.senderRole === "super_admin");
+          if (msgWithSuperAdmin) {
+            superAdminUid = msgWithSuperAdmin.senderId;
+          }
+        }
+
+        targetReceiverId = superAdminUid || "sabinsaji-superadmin-uid";
         targetReceiverRole = "super_admin";
       } catch (err) {
         console.error("Failed to lookup Super Admin UID:", err);
