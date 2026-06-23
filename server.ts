@@ -114,32 +114,7 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
         return;
       }
 
-      // Dynamically import firebase-admin to avoid top-level issues
-      const admin = await import("firebase-admin").catch(() => null);
-      if (!admin) {
-        res.status(500).json({ error: "SERVER_ERROR", message: "Firebase Admin not available." });
-        return;
-      }
-
-      // Initialize admin app only once
-      if (!admin.apps || admin.apps.length === 0) {
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY 
-          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-          : null;
-        if (serviceAccount) {
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-          });
-        } else {
-          admin.initializeApp({
-            credential: admin.credential.applicationDefault(),
-            projectId: "ai-studio-applet-webapp-d8652",
-          });
-        }
-      }
-
-      const db = admin.firestore();
-      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+      const { db } = await getFirebaseAdmin();
 
       const docRef = db.collection("complaints").doc();
       const complaintId = docRef.id;
@@ -165,24 +140,29 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
   // 3. Admin Management API routes (Super Admin only — uses Firebase Admin SDK)
 
   // Helper: lazily initialize and return firebase-admin app
-  async function getAdminApp() {
-    const admin = await import("firebase-admin").catch(() => null);
-    if (!admin) throw new Error("firebase-admin module not available");
+  // Helper: lazily initialize and return firebase-admin services (auth, db)
+  async function getFirebaseAdmin() {
+    const { initializeApp, cert, applicationDefault, getApps } = await import("firebase-admin/app");
+    const { getAuth } = await import("firebase-admin/auth");
+    const { getFirestore } = await import("firebase-admin/firestore");
 
-    if (!admin.apps || admin.apps.length === 0) {
+    const apps = getApps();
+    let app;
+    if (apps.length === 0) {
       const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
         ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
         : null;
-      if (serviceAccount) {
-        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-      } else {
-        admin.initializeApp({
-          credential: admin.credential.applicationDefault(),
-          projectId: "ai-studio-applet-webapp-d8652",
-        });
-      }
+      app = initializeApp({
+        credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
+        projectId: "ai-studio-applet-webapp-d8652",
+      });
+    } else {
+      app = apps[0];
     }
-    return admin;
+
+    const auth = getAuth(app);
+    const db = getFirestore(app, "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e");
+    return { auth, db };
   }
 
   // POST /api/create-admin — create Firebase Auth user + adminUsers doc
@@ -193,12 +173,10 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
         res.status(400).json({ error: "VALIDATION_ERROR", message: "Name, email, role, and password are required." });
         return;
       }
-      const admin = await getAdminApp();
-      const db = admin.firestore();
-      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+      const { auth, db } = await getFirebaseAdmin();
 
       // Create Firebase Auth user
-      const userRecord = await admin.auth().createUser({ email, password, displayName: name });
+      const userRecord = await auth.createUser({ email, password, displayName: name });
 
       // Write adminUsers doc
       await db.collection("adminUsers").doc(userRecord.uid).set({
@@ -231,9 +209,7 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
         res.status(400).json({ error: "VALIDATION_ERROR", message: "uid and updates are required." });
         return;
       }
-      const admin = await getAdminApp();
-      const db = admin.firestore();
-      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+      const { auth, db } = await getFirebaseAdmin();
 
       await db.collection("adminUsers").doc(uid).update({
         ...updates,
@@ -242,7 +218,7 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
 
       // If new displayName provided, update Auth too
       if (updates.name) {
-        await admin.auth().updateUser(uid, { displayName: updates.name });
+        await auth.updateUser(uid, { displayName: updates.name });
       }
 
       res.json({ success: true });
@@ -260,8 +236,8 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
         res.status(400).json({ error: "VALIDATION_ERROR", message: "uid and a newPassword (min 6 chars) are required." });
         return;
       }
-      const admin = await getAdminApp();
-      await admin.auth().updateUser(uid, { password: newPassword });
+      const { auth } = await getFirebaseAdmin();
+      await auth.updateUser(uid, { password: newPassword });
       res.json({ success: true });
     } catch (err: any) {
       console.error("[Reset Password API] Error:", err);
@@ -277,11 +253,9 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
         res.status(400).json({ error: "VALIDATION_ERROR", message: "uid is required." });
         return;
       }
-      const admin = await getAdminApp();
-      const db = admin.firestore();
-      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+      const { auth, db } = await getFirebaseAdmin();
 
-      await admin.auth().deleteUser(uid);
+      await auth.deleteUser(uid);
       await db.collection("adminUsers").doc(uid).delete();
 
       res.json({ success: true });
