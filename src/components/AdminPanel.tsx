@@ -606,6 +606,7 @@ export default function AdminPanel({
         attendancePercentage: Number(editingAttendance.attendancePercentage),
         updatedAt: new Date().toISOString()
       });
+      await logAdminAction(`edited attendance record for student ${editingAttendance.studentName}`);
       setEditingAttendance(null);
       setInfoMessage("✅ Attendance record updated successfully.");
       onRefreshData();
@@ -1057,6 +1058,7 @@ export default function AdminPanel({
         adminRemarks: complaintRemarksInput.trim(),
         updatedAt: nowISO
       });
+      await logAdminAction(`updated complaint status to ${nextStatus}`);
       
       if (selectedComplaintDetail && selectedComplaintDetail.complaintId === complaintId) {
         setSelectedComplaintDetail(prev => prev ? {
@@ -1331,123 +1333,141 @@ export default function AdminPanel({
                 
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
                   {[
-                    { label: "Total Students", count: students.length, color: "from-blue-600 to-sky-500", icon: GraduationCap },
-                    { label: "Total Teachers", count: teachers.length, color: "from-orange-500 to-amber-500", icon: Users },
-                    { label: "Total Notices", count: notices.length, color: "from-purple-600 to-indigo-500", icon: Bell },
-                    { label: "Total Notes", count: notes.length, color: "from-emerald-600 to-teal-500", icon: BookOpen },
-                    { label: "Total Homework", count: assignments.length, color: "from-rose-600 to-pink-500", icon: ClipboardList },
-                  ].map((card, i) => {
-                    const Icon = card.icon;
-                    return (
-                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                          <Icon className="h-5 w-5" />
+                    { label: "Total Students", count: students.length, color: "from-blue-600 to-sky-500", icon: GraduationCap, perm: "students" },
+                    { label: "Total Teachers", count: teachers.length, color: "from-orange-500 to-amber-500", icon: Users, perm: "teachers" },
+                    { label: "Total Notices", count: notices.length, color: "from-purple-600 to-indigo-500", icon: Bell, perm: "notices" },
+                    { label: "Total Notes", count: notes.length, color: "from-emerald-600 to-teal-500", icon: BookOpen, perm: "notes" },
+                    { label: "Total Homework", count: assignments.length, color: "from-rose-600 to-pink-500", icon: ClipboardList, perm: "assignments" },
+                  ]
+                    .filter((card) => !card.perm || !permissions || (permissions as any)[card.perm] === true)
+                    .map((card, i) => {
+                      const Icon = card.icon;
+                      return (
+                        <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                          <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                          <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
                         </div>
-                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
 
                 {/* Attendance Analytics Dashboard Row */}
-                <h4 className="text-sm font-extrabold text-slate-800 mt-6">Attendance Metrics Overview</h4>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {[
-                    { label: "Average Attendance", count: `${avgAttendance}%`, color: "from-blue-600 to-indigo-500", icon: Clock },
-                    { label: "Students Above 90%", count: above90Count, color: "from-emerald-600 to-teal-500", icon: GraduationCap },
-                    { label: "Students Below 75%", count: below75Count, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                    { label: "Attendance Alerts", count: `${shortageAlertsCount} shortage`, color: "from-rose-600 to-pink-500", icon: AlertCircle, badge: "Shortage" }
-                  ].map((card, i) => {
-                    const Icon = card.icon;
-                    return (
-                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
-                        {card.badge && (
-                          <span className="absolute top-2 right-2 bg-red-100 text-red-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
-                            {card.badge}
-                          </span>
-                        )}
-                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(!permissions || permissions.attendance === true) && (
+                  <>
+                    <h4 className="text-sm font-extrabold text-slate-800 mt-6">Attendance Metrics Overview</h4>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {[
+                        { label: "Average Attendance", count: `${avgAttendance}%`, color: "from-blue-600 to-indigo-500", icon: Clock },
+                        { label: "Students Above 90%", count: above90Count, color: "from-emerald-600 to-teal-500", icon: GraduationCap },
+                        { label: "Students Below 75%", count: below75Count, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                        { label: "Attendance Alerts", count: `${shortageAlertsCount} shortage`, color: "from-rose-600 to-pink-500", icon: AlertCircle, badge: "Shortage" }
+                      ].map((card, i) => {
+                        const Icon = card.icon;
+                        return (
+                          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                            {card.badge && (
+                              <span className="absolute top-2 right-2 bg-red-100 text-red-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                                {card.badge}
+                              </span>
+                            )}
+                            <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                            <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {/* Complaints Analytics Dashboard Row */}
-                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 font-sans text-xs">
-                  {[
-                    { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
-                    { label: "Pending Complaints", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
-                    { label: "Under Review Complaints", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
-                    { label: "Resolved Complaints", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle },
-                    { label: "Anonymous Complaints", count: anonymousComplaintsCount, color: "from-slate-600 to-slate-500", icon: Lock }
-                  ].map((card, i) => {
-                    const Icon = card.icon;
-                    return (
-                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
-                        {card.badge && (
-                          <span className="absolute top-2 right-2 bg-amber-100 text-amber-850 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
-                            {card.badge}
-                          </span>
-                        )}
-                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(!permissions || permissions.complaints === true) && (
+                  <>
+                    <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Complaints & Grievances Overview</h4>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 font-sans text-xs">
+                      {[
+                        { label: "Total Complaints", count: totalComplaintsCount, color: "from-indigo-600 to-blue-500", icon: MessageSquare },
+                        { label: "Pending Complaints", count: pendingComplaintsCount, color: "from-amber-500 to-orange-500", icon: Clock, badge: pendingComplaintsCount > 0 ? `${pendingComplaintsCount} New` : undefined },
+                        { label: "Under Review Complaints", count: underReviewComplaintsCount, color: "from-purple-600 to-indigo-500", icon: Eye },
+                        { label: "Resolved Complaints", count: resolvedComplaintsCount, color: "from-emerald-600 to-teal-500", icon: CheckCircle },
+                        { label: "Anonymous Complaints", count: anonymousComplaintsCount, color: "from-slate-600 to-slate-500", icon: Lock }
+                      ].map((card, i) => {
+                        const Icon = card.icon;
+                        return (
+                          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs relative">
+                            {card.badge && (
+                              <span className="absolute top-2 right-2 bg-amber-100 text-amber-850 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase">
+                                {card.badge}
+                              </span>
+                            )}
+                            <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                            <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {/* Attendance Duplicate & Import Analytics Row */}
-                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Attendance Duplicate & Import Metrics</h4>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
-                  {[
-                    { label: "Total Attendance Students", count: new Set(attendance.map(a => a.studentId)).size, color: "from-sky-600 to-sky-500", icon: Users },
-                    { label: "Imported Students", count: attendanceStats.importedStudentsCount, color: "from-blue-600 to-indigo-500", icon: ClipboardCheck },
-                    { label: "Duplicate Records Found", count: attendanceStats.duplicateRecordsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                    { label: "Duplicate Records Removed", count: attendanceStats.duplicateRecordsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
-                  ].map((card, i) => {
-                    const Icon = card.icon;
-                    return (
-                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(!permissions || permissions.attendance === true) && (
+                  <>
+                    <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Attendance Duplicate & Import Metrics</h4>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+                      {[
+                        { label: "Total Attendance Students", count: new Set(attendance.map(a => a.studentId)).size, color: "from-sky-600 to-sky-500", icon: Users },
+                        { label: "Imported Students", count: attendanceStats.importedStudentsCount, color: "from-blue-600 to-indigo-500", icon: ClipboardCheck },
+                        { label: "Duplicate Records Found", count: attendanceStats.duplicateRecordsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                        { label: "Duplicate Records Removed", count: attendanceStats.duplicateRecordsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+                      ].map((card, i) => {
+                        const Icon = card.icon;
+                        return (
+                          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                            <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                            <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {/* Blood Bank Duplicate & Import Analytics Row */}
-                <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Blood Bank Duplicate & Import Metrics</h4>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
-                  {[
-                    { label: "Total Student Donors", count: donors.length, color: "from-red-600 to-rose-500", icon: Droplet },
-                    { label: "Total External Donors", count: outsiderDonors.length, color: "from-pink-600 to-rose-500", icon: Heart },
-                    { label: "Duplicate Donors Found", count: bloodBankStats.duplicateDonorsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
-                    { label: "Duplicate Donors Removed", count: bloodBankStats.duplicateDonorsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
-                  ].map((card, i) => {
-                    const Icon = card.icon;
-                    return (
-                      <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
-                        <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(!permissions || permissions.bloodbank === true || permissions.outsiderDonors === true) && (
+                  <>
+                    <h4 className="text-sm font-extrabold text-slate-800 mt-6 font-sans">Blood Bank Duplicate & Import Metrics</h4>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 font-sans text-xs">
+                      {[
+                        { label: "Total Student Donors", count: donors.length, color: "from-red-600 to-rose-500", icon: Droplet },
+                        { label: "Total External Donors", count: outsiderDonors.length, color: "from-pink-600 to-rose-500", icon: Heart },
+                        { label: "Duplicate Donors Found", count: bloodBankStats.duplicateDonorsFound, color: "from-amber-500 to-orange-500", icon: AlertCircle },
+                        { label: "Duplicate Donors Removed", count: bloodBankStats.duplicateDonorsRemoved, color: "from-rose-600 to-pink-500", icon: Trash2 }
+                      ].map((card, i) => {
+                        const Icon = card.icon;
+                        return (
+                          <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-2xs">
+                            <div className={`mx-auto flex h-9.5 w-9.5 items-center justify-center rounded-xl bg-linear-to-br ${card.color} text-white shadow-2xs`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <p className="mt-2 text-2xl font-extrabold text-slate-800 tracking-tight">{card.count}</p>
+                            <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase leading-snug">{card.label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 <div className="rounded-2xl bg-linear-to-r from-blue-500 to-indigo-500 p-6 text-white">
                   <h4 className="text-md font-bold">Admin Knowledge Injection Control</h4>
@@ -2661,6 +2681,7 @@ export default function AdminPanel({
                     adminRemarks: adminRemarksInput.trim(),
                     reviewedDate: nowISO
                   });
+                  await logAdminAction(`updated request status to ${nextStatus} for: "${selectedRequestDetail?.studentName || reqId}"`);
                   
                   if (selectedRequestDetail && selectedRequestDetail.id === reqId) {
                     setSelectedRequestDetail(prev => prev ? {

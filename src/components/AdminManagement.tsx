@@ -16,11 +16,13 @@ interface AdminManagementProps {
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   student_admin: "Student Admin",
+  support_admin: "Support Admin",
   admin: "Admin",
   super_admin: "Super Admin",
 };
 const ROLE_COLORS: Record<AdminRole, string> = {
   student_admin: "bg-emerald-100 text-emerald-700",
+  support_admin: "bg-amber-100 text-amber-700",
   admin: "bg-blue-100 text-blue-700",
   super_admin: "bg-purple-100 text-purple-700",
 };
@@ -122,7 +124,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     if (createForm.password.length < 6) {
       setCreateError("Password must be at least 6 characters."); return;
     }
-    if (!["student_admin", "admin", "super_admin"].includes(createForm.role)) {
+    if (!["student_admin", "support_admin", "admin", "super_admin"].includes(createForm.role)) {
       setCreateError("Please select a valid admin role."); return;
     }
     setIsCreating(true);
@@ -199,8 +201,13 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     setEditRole(admin.role);
     setEditSuspended(admin.suspended);
     const hasCustom = !!admin.customPermissions && Object.keys(admin.customPermissions).length > 0;
-    setUseCustomPerms(hasCustom);
-    setEditCustomPerms(hasCustom ? (admin.customPermissions as Partial<AdminPermissions>) : {});
+    if (admin.role === "support_admin") {
+      setUseCustomPerms(true);
+      setEditCustomPerms(hasCustom ? (admin.customPermissions as Partial<AdminPermissions>) : { ...DEFAULT_PERMISSIONS.support_admin });
+    } else {
+      setUseCustomPerms(hasCustom);
+      setEditCustomPerms(hasCustom ? (admin.customPermissions as Partial<AdminPermissions>) : {});
+    }
   };
 
   // ── SAVE EDIT (Client-side, Vercel-compatible) ───────────────────────────
@@ -210,7 +217,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
     try {
       const { doc, updateDoc } = await import("firebase/firestore");
       const userDocRef = doc(db, "users", editingAdmin.uid);
-      const permissions = useCustomPerms ? editCustomPerms : DEFAULT_PERMISSIONS[editRole];
+      const permissions = (useCustomPerms || editRole === "support_admin") ? editCustomPerms : DEFAULT_PERMISSIONS[editRole];
 
       await updateDoc(userDocRef, {
         role: editRole,
@@ -437,6 +444,7 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
                   className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-800 outline-none focus:border-purple-500"
                 >
                   <option value="student_admin">Student Admin</option>
+                  <option value="support_admin">Support Admin</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
@@ -472,10 +480,21 @@ export default function AdminManagement({ currentAdminUid, currentAdminEmail }: 
                 <label className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Role</label>
                 <select
                   value={editRole}
-                  onChange={(e) => { setEditRole(e.target.value as AdminRole); setUseCustomPerms(false); setEditCustomPerms({}); }}
+                  onChange={(e) => {
+                    const newRole = e.target.value as AdminRole;
+                    setEditRole(newRole);
+                    if (newRole === "support_admin") {
+                      setUseCustomPerms(true);
+                      setEditCustomPerms({ ...DEFAULT_PERMISSIONS.support_admin });
+                    } else {
+                      setUseCustomPerms(false);
+                      setEditCustomPerms({});
+                    }
+                  }}
                   className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-semibold text-slate-800 outline-none focus:border-blue-500"
                 >
                   <option value="student_admin">Student Admin</option>
+                  <option value="support_admin">Support Admin</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>

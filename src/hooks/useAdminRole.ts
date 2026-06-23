@@ -16,6 +16,12 @@ export const DEFAULT_PERMISSIONS: Record<AdminRole, AdminPermissions> = {
     bloodbank: false, requests: false, outsiderDonors: false, complaints: false, adminManagement: false,
     activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
   },
+  support_admin: {
+    notices: false, teachers: false, students: false, attendance: false,
+    notes: false, assignments: false, qpapers: false,
+    bloodbank: false, requests: false, outsiderDonors: false, complaints: false, adminManagement: false,
+    activityLogs: false, systemSettings: false, announcements: false, databaseTools: false, backupReports: false, securityCenter: false,
+  },
   admin: {
     notices: true, teachers: true, students: true, attendance: true,
     notes: true, assignments: true, qpapers: true,

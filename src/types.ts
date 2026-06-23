@@ -182,7 +182,7 @@ export interface OutsiderBloodDonorRequest {
 
 // ── Role-Based Admin System ──────────────────────────────────────────────────
 
-export type AdminRole = "student_admin" | "admin" | "super_admin";
+export type AdminRole = "student_admin" | "support_admin" | "admin" | "super_admin";
 
 export interface AdminPermissions {
   notices: boolean;
