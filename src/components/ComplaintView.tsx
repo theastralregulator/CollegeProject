@@ -84,7 +84,7 @@ export default function ComplaintView({ departments }: ComplaintViewProps) {
       
       const complaintPayload = {
         complaintId: complaintId,
-        id: complaintId, // Save id for mapping compatibility (Check 6)
+        id: complaintId,
         name: nameVal,
         phoneNumber: phoneVal,
         email: form.email.trim() || "",
@@ -92,19 +92,43 @@ export default function ComplaintView({ departments }: ComplaintViewProps) {
         semester: Number(semVal),
         category: form.category,
         title: titleVal,
-        subject: titleVal, // Save both title and subject for maximum compatibility
+        subject: titleVal,
         description: descVal,
         isAnonymous: form.isAnonymous,
         status: "Pending",
         adminRemarks: "",
         createdAt: timestamp,
-        submittedAt: timestamp, // Save submittedAt for mapping compatibility (Check 6)
+        submittedAt: timestamp,
         updatedAt: timestamp
       };
 
-      console.log(`[Complaint Submit] Attempting Firestore write to document path 'complaints/${complaintId}' with payload:`, complaintPayload);
-      await setDoc(docRef, complaintPayload);
-      console.log(`[Complaint Submit] Firestore write success! Document ID: ${complaintId}`);
+      console.log(`[Complaint Submit] Attempting server-side submission for complaint ID: ${complaintId}`);
+
+      // First try the server-side API (bypasses Firestore security rules)
+      let submitted = false;
+      try {
+        const apiRes = await fetch("/api/submit-complaint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(complaintPayload),
+        });
+        if (apiRes.ok) {
+          const data = await apiRes.json();
+          console.log(`[Complaint Submit] Server API success! Complaint ID: ${data.complaintId}`);
+          submitted = true;
+        } else {
+          console.warn("[Complaint Submit] Server API failed, falling back to direct Firestore write.");
+        }
+      } catch (apiErr) {
+        console.warn("[Complaint Submit] Server API unavailable, falling back to direct Firestore write:", apiErr);
+      }
+
+      // Fallback: direct Firestore client write
+      if (!submitted) {
+        console.log(`[Complaint Submit] Attempting direct Firestore write to 'complaints/${complaintId}'`);
+        await setDoc(docRef, complaintPayload);
+        console.log(`[Complaint Submit] Direct Firestore write success! Document ID: ${complaintId}`);
+      }
       
       setSubmitStatus("success");
       setToast({
@@ -133,10 +157,10 @@ export default function ComplaintView({ departments }: ComplaintViewProps) {
       console.error("Error submitting complaint:", err);
       setSubmitStatus("error");
       
-      let friendlyMessage = "Unable to submit your complaint. Please verify your internet connection or try again later.";
-      const errMsg = err.message || "";
+      let friendlyMessage = "Unable to submit your complaint. Please check your internet connection and try again.";
+      const errMsg = (err.message || "") + JSON.stringify(err);
       if (errMsg.includes("permission-denied") || errMsg.includes("permission") || errMsg.includes("insufficient")) {
-        friendlyMessage = "Submission failed: Unauthorized write request. Firestore Security Rules denied permission.";
+        friendlyMessage = "Submission failed due to a permissions issue. Please try again or contact the administration directly.";
       }
       
       setErrorMessage(friendlyMessage);

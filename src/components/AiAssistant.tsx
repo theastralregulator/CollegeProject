@@ -9,6 +9,7 @@ interface Message {
 }
 
 interface AiAssistantProps {
+  activeTab?: string;
   initialQuery?: string;
   onClearInitialQuery?: () => void;
   // Context arrays passed to compile the dynamic search model
@@ -24,6 +25,7 @@ interface AiAssistantProps {
 }
 
 export default function AiAssistant({
+  activeTab,
   initialQuery = "",
   onClearInitialQuery,
   notices,
@@ -71,23 +73,23 @@ export default function AiAssistant({
     }
   }, [initialQuery]);
 
-  // Scroll to bottom
+  const isFirstRender = useRef(true);
+  // Scroll to bottom (skip on first render to keep header visible)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Reset window scroll to top when AI Assistant mounts
+  // Reset scroll positions when navigating to the AI Assistant tab
   useEffect(() => {
+    // Reset the window scroll to top
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, []);
-
-  // Reset scroll position for AI Assistant container on tab change
-  useEffect(() => {
-    // Assuming the parent component passes activeTab via props is not available here,
-    // but the component is rendered conditionally based on activeTab === "ai".
-    // When this component mounts (or re-mounts) we can reset its own scroll container.
+    // Reset the internal messages container scroll
     messagesContainerRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, []);
+  }, [activeTab]);
 
 
   // Speech helper

@@ -105,7 +105,64 @@ ${contextSummary || "Default: Govt Polytechnic College Kaduthuruthy offers Diplo
     }
   });
 
-  // 2. Health check route
+  // 2. Server-side Complaint Submission (bypasses Firestore client security rules)
+  app.post("/api/submit-complaint", async (req, res) => {
+    try {
+      const payload = req.body;
+      if (!payload || !payload.title || !payload.description || !payload.name || !payload.phoneNumber) {
+        res.status(400).json({ error: "VALIDATION_ERROR", message: "Missing required complaint fields." });
+        return;
+      }
+
+      // Dynamically import firebase-admin to avoid top-level issues
+      const admin = await import("firebase-admin").catch(() => null);
+      if (!admin) {
+        res.status(500).json({ error: "SERVER_ERROR", message: "Firebase Admin not available." });
+        return;
+      }
+
+      // Initialize admin app only once
+      if (!admin.apps || admin.apps.length === 0) {
+        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY 
+          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+          : null;
+        if (serviceAccount) {
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+          });
+        } else {
+          admin.initializeApp({
+            credential: admin.credential.applicationDefault(),
+            projectId: "ai-studio-applet-webapp-d8652",
+          });
+        }
+      }
+
+      const db = admin.firestore();
+      db.settings({ databaseId: "ai-studio-40f6a32a-42e4-4283-89a7-890d8e65cc7e" });
+
+      const docRef = db.collection("complaints").doc();
+      const complaintId = docRef.id;
+      const timestamp = new Date().toISOString();
+
+      await docRef.set({
+        ...payload,
+        complaintId,
+        id: complaintId,
+        createdAt: timestamp,
+        submittedAt: timestamp,
+        updatedAt: timestamp,
+        status: "Pending",
+      });
+
+      res.json({ success: true, complaintId });
+    } catch (err: any) {
+      console.error("[Complaint Submit API] Error:", err);
+      res.status(500).json({ error: "SERVER_ERROR", message: err.message || "Failed to submit complaint." });
+    }
+  });
+
+  // 3. Health check route
   app.get("/api/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   });

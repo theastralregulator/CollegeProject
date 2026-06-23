@@ -711,6 +711,7 @@ export default function App() {
                   questionPapers={questionPapers}
                   collegeInformation={collegeInfo}
                   attendance={attendance}
+                  activeTab={activeTab}
                 />
               </motion.div>
             )}
