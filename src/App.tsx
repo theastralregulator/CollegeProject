@@ -471,7 +471,7 @@ export default function App() {
                     src={collegeHero}
                     alt="Govt Polytechnic College Kaduthuruthy building"
                     referrerPolicy="no-referrer"
-                    className="absolute inset-0 h-full w-full object-cover object-[60%_center] md:object-center contrast-[1.03] saturate-[1.05] brightness-[0.98] transition-transform duration-1000 group-hover:scale-101 z-0"
+                    className="absolute inset-0 h-full w-full object-cover object-[80%_20%] md:object-center contrast-[1.03] saturate-[1.05] brightness-[0.98] transition-transform duration-1000 group-hover:scale-101 z-0"
                   />
                   
                   {/* Very light blue overlay - Reduced blue tint opacity to 15% to preserve natural colors */}
