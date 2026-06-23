@@ -9,7 +9,7 @@ import { Notice, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, 
 import { db } from "../firebase";
 import { collection, addDoc, doc, setDoc } from "firebase/firestore";
 import { motion } from "motion/react";
-import { sendEmailNotification } from "../utils/emailService";
+
 /* ==========================================================================
    ABOUT VIEW
    ========================================================================== */
@@ -778,14 +778,7 @@ export function StudentsView({ students, departments, studentRequests = [] }: St
         reviewedDate: "",
         adminRemarks: ""
       });
-// Send email notification to admins
-await sendEmailNotification("request", {
-  name: requesterName.trim(),
-  email: requesterEmail.trim(),
-  phone: requesterPhone.trim(),
-  details: reqPurpose.trim(),
-  timestamp: nowISO,
-});
+
       setSuccessMsg("Your request has been submitted successfully. The college administration will review your request and update you through your Email or WhatsApp within one week.");
       setRequesterName("");
       setRequesterPhone("");

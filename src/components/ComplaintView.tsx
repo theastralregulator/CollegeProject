@@ -3,7 +3,6 @@ import { collection, doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { MessageSquare, ShieldAlert, CheckCircle, Send } from "lucide-react";
 import { Department } from "../types";
-import { sendEmailNotification } from "../utils/emailService";
 
 interface ComplaintViewProps {
   departments: Department[];
@@ -105,14 +104,6 @@ export default function ComplaintView({ departments }: ComplaintViewProps) {
 
       console.log(`[Complaint Submit] Attempting Firestore write to document path 'complaints/${complaintId}' with payload:`, complaintPayload);
       await setDoc(docRef, complaintPayload);
-// Send email notification to admins
-await sendEmailNotification("complaint", {
-  name: form.name.trim(),
-  email: form.email.trim(),
-  phone: form.phoneNumber?.trim() || "",
-  details: form.description?.trim() || "",
-  timestamp: timestamp,
-});
       console.log(`[Complaint Submit] Firestore write success! Document ID: ${complaintId}`);
       
       setSubmitStatus("success");

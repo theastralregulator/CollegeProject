@@ -18,7 +18,6 @@ import {
   increment
 } from "firebase/firestore";
 import { auth, db, handleFirestoreError, OperationType } from "../firebase";
-import { sendEmailNotification } from "../utils/emailService";
 import { 
   Notice, Department, Teacher, Student, Note, QuestionPaper, Assignment, BloodDonor, StudentRequest, AttendanceRecord, Complaint,
   OutsiderBloodDonor, OutsiderBloodDonorRequest
@@ -466,14 +465,6 @@ export default function AdminPanel({
       if (req.gender) donorData.gender = req.gender;
       
       await setDoc(doc(db, "outsiderBloodDonors", req.id), donorData);
-      // Send email notification to admins
-      await sendEmailNotification("donor", {
-        name: req.name,
-        email: req.email || "",
-        phone: req.phone || "",
-        details: `Blood Group: ${req.bloodGroup}, Place: ${req.place}, District: ${req.district}`,
-        timestamp: new Date().toISOString(),
-      });
       setInfoMessage(`✅ Approved request and registered ${req.name} as external blood donor.`);
       onRefreshData();
     } catch (err: any) {
